@@ -1,32 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'data/app_state.dart';
 import 'screens/analyze_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/plan_screen.dart';
+import 'screens/progress_screen.dart';
 import 'screens/team_screen.dart';
-import 'screens/techniques_screen.dart';
+import 'services/cloud.dart';
 import 'theme/app_theme.dart';
 import 'widgets/glass.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
   ));
-  runApp(const FulcroApp());
+  try {
+    await CloudService.init();
+  } catch (e) {
+    debugPrint('Fulcro: no se pudo iniciar Supabase ($e)');
+  }
+  final state = await AppState.load();
+  runApp(FulcroApp(state: state));
 }
 
 class FulcroApp extends StatelessWidget {
-  const FulcroApp({super.key});
+  const FulcroApp({super.key, required this.state});
+  final AppState state;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Fulcro',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: const Shell(),
+    return AppScope(
+      state: state,
+      child: MaterialApp(
+        title: 'Fulcro',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        home: const Shell(),
+      ),
     );
   }
 }
@@ -44,16 +58,20 @@ class _ShellState extends State<Shell> {
   static const _tabs = [
     (Icons.home_rounded, 'Inicio'),
     (Icons.adjust_rounded, 'Analizar'),
+    (Icons.show_chart_rounded, 'Progreso'),
     (Icons.groups_rounded, 'Equipo'),
-    (Icons.play_circle_outline_rounded, 'Técnicas'),
+    (Icons.event_note_rounded, 'Plan'),
   ];
+
+  void _go(int i) => setState(() => _index = i);
 
   // Screens are built only while selected, so the camera is released when leaving Analizar.
   Widget _screen() => switch (_index) {
-        0 => HomeScreen(onAnalyze: () => setState(() => _index = 1)),
+        0 => HomeScreen(onAnalyze: () => _go(1), onPlan: () => _go(4)),
         1 => const AnalyzeScreen(),
-        2 => const TeamScreen(),
-        _ => const TechniquesScreen(),
+        2 => const ProgressScreen(),
+        3 => const TeamScreen(),
+        _ => const PlanScreen(),
       };
 
   @override
@@ -71,7 +89,7 @@ class _ShellState extends State<Shell> {
               Expanded(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () => setState(() => _index = i),
+                  onTap: () => _go(i),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
@@ -83,7 +101,7 @@ class _ShellState extends State<Shell> {
                       const SizedBox(height: 2),
                       Text(t.$2,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w600,
                             color: i == _index ? FulcroColors.text : FulcroColors.muted,
                           )),

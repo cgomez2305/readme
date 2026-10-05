@@ -79,4 +79,34 @@ flutter build apk --release --split-per-abi   # APKs en build/app/outputs/flutte
 ```
 El APK de `arm64-v8a` sirve para casi todos los móviles actuales. Cada push también lo compila con GitHub Actions (`.github/workflows/build-apk.yml`).
 
-Estado v0.1: la pantalla **Analizar** abre la cámara trasera, detecta el brazo con ML Kit, mide el ángulo del codo y cuenta repeticiones en vivo. Inicio, Equipo y Técnicas usan datos de ejemplo. Falta: guardar sesiones, login, y firmar el APK con una clave propia antes de publicar en Google Play.
+## Funciones (v0.2)
+- **Series guardadas:** cada serie queda en el móvil con ejercicio, brazo, peso, repeticiones, ángulos y tempo. Pantalla **Progreso** con gráficas por ejercicio.
+- **Informe de serie:** rango, tempo, repetición donde empieza la fatiga (el rango baja 15% o el tempo sube 25% frente a las 3 primeras reps; necesita 5 reps) y consejos por reglas.
+- **Guía de cámara:** contorno en pantalla, aviso de luz baja y de brazo fuera de cuadro.
+- **Grupo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase.
+- **Brazo derecho vs. izquierdo:** compara rango y tempo de los últimos 30 días.
+- **Ejercicios:** press lateral, pronación, supinación, cup, rising y back pressure, cada uno con su articulación medida, objetivos y consejos de cámara. Los umbrales son valores iniciales y hay que ajustarlos con datos reales.
+- **Descanso:** temporizador con aviso sonoro y vibración, y peso por serie.
+- **Cámara lenta:** revisión del vídeo a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
+- **Plan semanal:** meta de días, ejercicio por día, racha de semanas y recordatorios.
+- **Dolor y notas:** zona, intensidad y nota por serie. En Progreso se ve junto al peso usado.
+
+Límites conocidos: la pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta. El vídeo se graba en el móvil y no se sube. La revisión con esqueleto sobre el vídeo y la grabación con análisis simultáneo dependen del modelo de móvil y están sin probar en un dispositivo real.
+
+## Grupo (Supabase)
+1. Crea un proyecto gratis en supabase.com.
+2. En **SQL Editor** pega y ejecuta `supabase/schema.sql`.
+3. En **Authentication > Providers > Email** desactiva "Confirm email" si no quieres que cada persona confirme su correo.
+4. Copia la URL del proyecto y la clave publicable (Settings > API Keys).
+5. Compila con las claves:
+```bash
+flutter build apk --release --split-per-abi \
+  --dart-define=SUPABASE_URL=https://TU-PROYECTO.supabase.co \
+  --dart-define=SUPABASE_KEY=TU_CLAVE_PUBLICABLE
+```
+En GitHub, guarda `SUPABASE_URL` y `SUPABASE_KEY` en *Settings > Secrets and variables > Actions > Variables* y el workflow las usa. Sin ellas la app funciona igual, solo sin grupo.
+
+Solo se suben los resúmenes de cada serie (ejercicio, peso, reps, rango, tempo, dolor), nunca el vídeo. Las tablas tienen reglas de acceso: cada persona solo ve sus datos y los de su grupo.
+
+## Pendiente
+Firmar el APK con una clave propia antes de publicar en Google Play, iOS, y la comparación con referencias de profesionales (Pro).

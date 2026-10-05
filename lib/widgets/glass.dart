@@ -136,3 +136,80 @@ class AmbientBackground extends StatelessWidget {
     );
   }
 }
+
+/// Small uppercase label above a title.
+class Eyebrow extends StatelessWidget {
+  const Eyebrow(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(text.toUpperCase(), style: const TextStyle(fontSize: 11, letterSpacing: 1.4, color: FulcroColors.muted));
+}
+
+/// Pill-shaped option selector.
+class Segmented<T> extends StatelessWidget {
+  const Segmented({super.key, required this.options, required this.value, required this.onChanged, required this.label});
+
+  final List<T> options;
+  final T value;
+  final ValueChanged<T> onChanged;
+  final String Function(T) label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Glass(
+      padding: const EdgeInsets.all(4),
+      radius: 16,
+      child: Row(children: [
+        for (final o in options)
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(o),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: o == value ? FulcroColors.glassStrong : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    label(o),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: o == value ? FulcroColors.text : FulcroColors.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Metric card: label, big value and an optional status pill.
+class MetricCard extends StatelessWidget {
+  const MetricCard({super.key, required this.label, required this.value, this.pill, this.pillColor = FulcroColors.text});
+
+  final String label;
+  final String value;
+  final String? pill;
+  final Color pillColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Glass(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(color: FulcroColors.muted, fontSize: 12)),
+        const SizedBox(height: 4),
+        FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: displayStyle(size: 24))),
+        if (pill != null) ...[const SizedBox(height: 6), Pill(pill!, color: pillColor)],
+      ]),
+    );
+  }
+}

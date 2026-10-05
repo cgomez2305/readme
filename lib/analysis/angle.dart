@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../data/models.dart';
+
 /// Interior angle in degrees at [b] formed by points [a]-[b]-[c].
 double jointAngle(
   ({double x, double y}) a,
@@ -14,35 +16,73 @@ double jointAngle(
   return math.acos((dot / mag).clamp(-1.0, 1.0)) * 180 / math.pi;
 }
 
-/// Counts repetitions from a stream of angles using hysteresis:
-/// a rep is one trip from above [openAbove] to below [closedBelow] and back.
-class RepCounter {
-  RepCounter({this.openAbove = 120, this.closedBelow = 70});
+/// Builds repetitions from a stream of (time, angle) samples.
+///
+/// A rep starts when the angle drops below [openAbove], is valid once it goes below
+/// [closedBelow], and ends when the angle returns above [openAbove]. Partial moves that
+/// never reach [closedBelow] are discarded. The range uses the highest angle seen
+/// before the drop, so it covers the whole movement.
+class RepTracker {
+  RepTracker({required this.openAbove, required this.closedBelow});
 
   final double openAbove;
   final double closedBelow;
-  int reps = 0;
-  double minAngle = 180;
-  double maxAngle = 0;
-  bool _closed = false;
+  final List<RepData> reps = [];
 
-  void add(double angle) {
-    if (angle < minAngle) minAngle = angle;
-    if (angle > maxAngle) maxAngle = angle;
-    if (!_closed && angle < closedBelow) {
-      _closed = true;
-    } else if (_closed && angle > openAbove) {
-      _closed = false;
-      reps++;
+  bool _inRep = false;
+  bool _reached = false;
+  int _startMs = 0;
+  double _min = 180;
+  double _max = 0;
+  double _openPeak = 0;
+  double _wristSum = 0;
+  int _wristN = 0;
+
+  /// Current angle state, useful for live feedback.
+  bool get inRep => _inRep;
+
+  void add(int tMs, double angle, {double? wrist}) {
+    if (!_inRep) {
+      if (angle >= openAbove) {
+        if (angle > _openPeak) _openPeak = angle;
+        return;
+      }
+      _inRep = true;
+      _reached = false;
+      _startMs = tMs;
+      _min = angle;
+      _max = angle > _openPeak ? angle : _openPeak;
+      _wristSum = 0;
+      _wristN = 0;
+    }
+
+    if (angle < _min) _min = angle;
+    if (angle > _max) _max = angle;
+    if (wrist != null) {
+      _wristSum += wrist;
+      _wristN++;
+    }
+    if (angle < closedBelow) _reached = true;
+
+    if (angle >= openAbove) {
+      if (_reached) {
+        reps.add(RepData(
+          startMs: _startMs,
+          endMs: tMs,
+          minAngle: _min,
+          maxAngle: _max,
+          wristAvg: _wristN == 0 ? null : _wristSum / _wristN,
+        ));
+      }
+      _inRep = false;
+      _openPeak = angle;
     }
   }
 
   void reset() {
-    reps = 0;
-    minAngle = 180;
-    maxAngle = 0;
-    _closed = false;
+    reps.clear();
+    _inRep = false;
+    _reached = false;
+    _openPeak = 0;
   }
-
-  double get range => maxAngle >= minAngle ? maxAngle - minAngle : 0;
 }
