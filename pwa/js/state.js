@@ -1,6 +1,7 @@
 // Shared app state with a tiny subscribe/notify mechanism.
 import { exercises, exerciseById, legacyIds } from './exercises.js';
 import * as store from './store.js';
+import { normalizePlan, gymDayCount, daysFromSessions, emptySessions } from './plans.js';
 
 const prefs = store.loadPrefs();
 
@@ -12,12 +13,12 @@ function migrate() {
     if (legacyIds[s.ex]) { s.ex = legacyIds[s.ex]; changed = true; }
   }
   if (changed) store.saveSets(sets);
-  const plan = store.loadPlan();
-  let planChanged = false;
-  for (const [wd, id] of Object.entries(plan.days)) {
-    if (legacyIds[id]) { plan.days[wd] = legacyIds[id]; planChanged = true; }
-  }
-  if (planChanged) store.savePlan(plan);
+  const raw = store.loadPlan();
+  const fix = (id) => legacyIds[id] ?? id;
+  for (const [wd, v] of Object.entries(raw.days ?? {})) raw.days[wd] = Array.isArray(v) ? v.map(fix) : fix(v);
+  for (const sess of Object.values(raw.sessions ?? {})) for (const it of sess.items ?? []) it.ex = fix(it.ex);
+  const plan = normalizePlan(raw); // older versions saved one exercise per day and no sessions
+  store.savePlan(plan);
   return { sets, plan };
 }
 const migrated = migrate();
@@ -102,10 +103,26 @@ export function setsToday(exId) {
   }).length;
 }
 
+/** True once the plan has at least one training day. */
+export const hasPlan = () => Object.keys(state.plan.days).length > 0;
+
+const todayWd = () => ((new Date().getDay() + 6) % 7) + 1; // 1 = Monday
+
+/** Today's session of the plan ({kind, title, note, items}), or null when there is no plan for the day. */
+export function todaySession() {
+  return state.plan.sessions?.[todayWd()] ?? null;
+}
+
+/** Today's planned item for one exercise ({ex, sets, reps|hold, pct, rest, ...}), or null. */
+export function plannedItemFor(exId) {
+  return todaySession()?.items.find((i) => i.ex === exId) ?? null;
+}
+
+/** The exercise to do next today: the first planned one that still has sets to do. */
 export function todayPlanned() {
-  const wd = ((new Date().getDay() + 6) % 7) + 1; // 1 = Monday
-  const id = state.plan.days[wd];
-  return id ? exerciseById(id) : null;
+  const items = todaySession()?.items ?? [];
+  const next = items.find((i) => setsToday(i.ex) < i.sets) ?? items[0];
+  return next ? exerciseById(next.ex) : null;
 }
 
 /** Saves a new set. media = { blob?, frames? }. Returns false if local storage is full or blocked. */
@@ -135,6 +152,18 @@ export async function deleteSet(id) {
 }
 export function updatePlan(patch) {
   state.plan = { ...state.plan, ...patch };
+  if (patch.sessions) { // keep the derived fields in step with the sessions
+    state.plan.days = daysFromSessions(state.plan.sessions);
+    if (!('goal' in patch)) state.plan.goal = Math.max(1, gymDayCount(state.plan.sessions));
+  }
+  store.savePlan(state.plan);
+  notify();
+}
+
+/** Removes the active plan (sessions and program). Reminder time and other settings stay. */
+export function clearPlan() {
+  const { program: _removed, ...rest } = state.plan;
+  state.plan = { ...rest, days: {}, sessions: emptySessions(), goal: 3 };
   store.savePlan(state.plan);
   notify();
 }

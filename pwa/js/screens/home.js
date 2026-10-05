@@ -1,12 +1,46 @@
-import { state, subscribe, pickExercise, setsToday, todayPlanned } from '../state.js';
+import { state, subscribe, pickExercise, setKg, setsToday, todayPlanned, todaySession, hasPlan } from '../state.js';
 import { exerciseById, isHold } from '../exercises.js';
 import {
   trainingDaysInWeek, weeklyStreak, rangeTrend, holdTrend, formatDay, formatTime, weekdayName, setAvgRange, setAvgTempo, fmtKg,
 } from '../analysis.js';
 import { esc, eyebrow, pill, on } from '../ui.js';
+import { prescriptionText, pctText, itemKg } from '../plans.js';
 import { trendChart } from '../charts.js';
 import { displayName } from '../cloud.js';
 import { armLabel } from '../exercises.js';
+
+const KIND_TEXT = { sparring: 'Hoy hay sparring', rest: 'Hoy toca descansar', recovery: 'Hoy · día después del sparring', train: 'Sesión de hoy' };
+
+/** Today's block: the planned session with progress per exercise, or a free-choice card when there is no plan. */
+function sessionCard(planned, ex, done) {
+  const sess = hasPlan() ? todaySession() : null;
+  if (sess && sess.items.length) {
+    return `<div class="glass">
+      ${eyebrow(KIND_TEXT[sess.kind] ?? 'Sesión de hoy')}
+      <div class="bold" style="font-size:20px;margin:4px 0 8px">${esc(sess.title)}</div>
+      ${sess.items.map((it) => {
+        const e = exerciseById(it.ex), d = setsToday(it.ex), kg = itemKg(it, state.oneRm[it.ex]);
+        return `<div class="row" style="padding:6px 0;border-top:1px solid var(--edge)"><div class="grow"><div class="small bold">${esc(e.name)}</div>
+          <div class="muted tiny">${esc(prescriptionText(it))} · ${esc(pctText(it))}${kg ? ` · ${kg.low === kg.high ? kg.low : `${kg.low}-${kg.high}`} kg` : ''}</div></div>
+          ${pill(`${d}/${it.sets}`, d >= it.sets ? 'good' : '')}</div>`;
+      }).join('')}
+      <div class="muted tiny" style="margin:8px 0 12px">${esc(sess.note ?? '')}</div>
+      <button class="btn" data-analyze="${ex.id}">${sess.items.every((i) => setsToday(i.ex) >= i.sets) ? 'Sesión completa · grabar otra' : 'Grabar y analizar'}</button></div>`;
+  }
+  if (sess) { // rest day or sparring
+    return `<div class="glass">
+      ${eyebrow(KIND_TEXT[sess.kind] ?? 'Hoy')}
+      <div class="bold" style="font-size:20px;margin:4px 0 6px">${esc(sess.title)}</div>
+      <div class="muted small">${esc(sess.note ?? '')}</div>
+      <button class="btn ghost" data-analyze="${ex.id}" style="margin-top:12px">Entrenar de todos modos</button></div>`;
+  }
+  return `<div class="glass">
+    ${eyebrow('Sin plan todavía')}
+    <div class="row" style="margin-top:6px"><div class="grow"><div class="bold" style="font-size:20px">${esc(ex.name)}</div><div class="muted small">${ex.defaultSets} series · ${esc(ex.focus)}</div></div>
+      ${pill(`${done}/${ex.defaultSets}`, done >= ex.defaultSets ? 'good' : '')}</div>
+    <div style="margin-top:14px"><button class="btn" data-analyze="${ex.id}">Grabar y analizar</button></div>
+    <button class="link" data-go="plan">Crear mi plan personalizado</button></div>`;
+}
 
 export function mount(root, api) {
   const render = () => {
@@ -29,14 +63,7 @@ export function mount(root, api) {
         <img src="icons/icon.svg" width="40" height="40" alt="" />
         <div class="grow">${eyebrow(`${weekdayName[wd]} · ${formatDay(now)}`)}<div class="title">${name ? `Hola, ${esc(name)}` : 'Hola, atleta'}</div></div>
       </div>
-      <div class="glass">
-        ${eyebrow(planned ? 'Sesión de hoy' : 'Sin sesión planificada hoy')}
-        <div class="row" style="margin-top:6px">
-          <div class="grow"><div class="bold" style="font-size:20px">${esc(ex.name)}</div><div class="muted small">${ex.defaultSets} series · ${esc(ex.focus)}</div></div>
-          ${pill(`${done}/${ex.defaultSets}`, done >= ex.defaultSets ? 'good' : '')}
-        </div>
-        <div style="margin-top:14px"><button class="btn" data-analyze="${ex.id}">Grabar y analizar</button></div>
-      </div>
+      ${sessionCard(planned, ex, done)}
       <div class="glass row">
         <div class="ring">
           <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="34" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="8"/>
@@ -69,7 +96,15 @@ export function mount(root, api) {
   render();
   const off = subscribe(render);
   const offClick = on(root, {
-    '[data-analyze]': (el) => { pickExercise(el.dataset.analyze); api.go('analizar'); },
+    '[data-analyze]': (el) => {
+      const id = el.dataset.analyze;
+      pickExercise(id);
+      // start from the planned weight when the 1RM is known
+      const item = todaySession()?.items.find((i) => i.ex === id);
+      const kg = item && itemKg(item, state.oneRm[id]);
+      if (kg) setKg(kg.high);
+      api.go('analizar');
+    },
     '[data-go]': (el) => api.go(el.dataset.go),
   });
   return () => { off(); offClick(); };

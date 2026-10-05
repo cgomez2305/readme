@@ -4,8 +4,9 @@
 // The selfie camera is the default; the front or back camera, or a specific lens, can be chosen.
 import {
   state, subscribe, currentExercise, pickExercise, pickArm, setKg, setRestSeconds, setsToday, startRest, addRest, cancelRest,
-  setCam, setDeviceId, setOneRm,
+  setCam, setDeviceId, setOneRm, plannedItemFor,
 } from '../state.js';
+import { prescriptionText, pctText, itemKg } from '../plans.js';
 import {
   exercises, jointLabel, isHold, freqText, freqMax, intensityText, recommendedKg, intensityStatus,
 } from '../exercises.js';
@@ -57,9 +58,14 @@ export function mount(root, api) {
     const e = ex();
     const days = weeklyDaysFor(state.sets, e.id, new Date());
     const max = freqMax(e, state.plan.sparring);
-    $('#a-head').innerHTML = `${eyebrow(`Serie ${setsToday(e.id) + 1} de ${e.defaultSets} · hoy`)}
+    const item = plannedItemFor(e.id); // today's prescription from the plan, if this exercise is in it
+    const kg = item && itemKg(item, state.oneRm[e.id]);
+    $('#a-head').innerHTML = `${eyebrow(`Serie ${setsToday(e.id) + 1} de ${item?.sets ?? e.defaultSets} · hoy`)}
       <button class="title" id="a-pick" style="background:none;border:0;color:inherit;padding:2px 0;text-align:left;cursor:pointer" ${recording ? 'disabled' : ''}>${esc(e.name)} ${recording ? '' : '▾'}</button>
       <div class="muted small">${isHold(e) ? 'Mide: tiempo y firmeza de la muñeca' : `Mide: ${jointLabel(e).toLowerCase()}`} · ${esc(e.focus)}</div>
+      ${item ? `<div class="glass good" style="margin-top:10px;padding:10px 14px"><div class="small"><b>Plan de hoy:</b> ${esc(prescriptionText(item))} · ${esc(pctText(item))} del 1RM${kg ? ` (${kg.low === kg.high ? kg.low : `${kg.low}-${kg.high}`} kg)` : ''} · descanso ${item.rest} s</div>
+        ${item.extraArm ? `<div class="tiny" style="color:var(--amber);margin-top:2px">+1 serie con el brazo ${item.extraArm === 'left' ? 'izquierdo' : 'derecho'} (más débil)</div>` : ''}
+        <div class="muted tiny" style="margin-top:2px">Termina con 2 repeticiones en reserva: nunca al fallo.</div></div>` : ''}
       <div class="wrap" style="margin-top:8px">${pill(`${days}/${max >= 7 ? '7' : max} días esta semana`, days > max ? 'warn' : days === max ? 'good' : '')}${pill(freqText(e, state.plan.sparring), 'mute')}</div>`;
     const warnDays = days >= max && setsToday(e.id) === 0 && max < 7;
     $('#a-warn').innerHTML = warnDays

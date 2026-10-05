@@ -17,7 +17,7 @@ Necesita la cámara (la app pide permiso la primera vez). Después de la primera
 - **Cámara lenta:** revisión a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
 - **Progreso:** semana, gráficas por ejercicio, comparación brazo derecho contra izquierdo, historial y dolor reportado.
 - **Descanso:** temporizador con sonido y vibración, y peso por serie.
-- **Plan:** meta semanal, ejercicio por día, racha de semanas y exportación al calendario con aviso.
+- **Plan:** planes semanales personalizados con y sin sparring, ciclo de 4 semanas con descarga, kg según tu 1RM, racha de semanas y exportación al calendario con aviso.
 - **Equipo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase (ver abajo).
 
 ## Ejercicios y guía básica
@@ -39,7 +39,47 @@ Frecuencia e intensidad son recomendaciones generales de un entrenador de armwre
 - **Nunca ir al máximo ni al fallo:** la tendinitis aparece al fallo. La app avisa si usas más del 10% por encima de la guía, si pasas del 90% de tu 1RM y cuando detecta fatiga en la serie.
 - **Frecuencia:** Analizar avisa cuando ya llegaste al máximo semanal del ejercicio, y Plan avisa si le asignas demasiados días. Con el interruptor de sparring, side pressure baja a una vez por semana.
 
-### Límites conocidos
+## Planes personalizados
+En **Plan** eliges si la semana tiene **sparring (domingo)** o no, los **días de gimnasio** (3 a 5 con sparring, 3 a 6 sin él) y la **semana del ciclo** (S1, S2, S3 y Descarga). La app arma la semana completa, la revisa contra la guía y, con tus 1RM, te dice los kg de cada serie. Con "Usar este plan" queda activo: **Inicio** muestra la sesión de hoy, **Analizar** muestra la prescripción y puedes exportarlo al calendario. Cada día se puede editar a mano y la app avisa si rompes alguna regla.
+
+Reglas que cumple todo plan generado (hay pruebas automáticas para todas las combinaciones):
+- **Frecuencia de tu entrenador:** ningún ejercicio pasa de su máximo semanal. Cupping busca 3 días y Retención de dedos 2. Side pressure es 1 vez con sparring y hasta 2 sin él. El pulgar va como complemento corto todos los días.
+- **Intensidad:** 60% del 1RM, y 30-40% en side pressure. Nunca al fallo: cada serie termina con 2 repeticiones en reserva.
+- **Recuperación de tendones (reglas nuestras):**
+  - El mismo ejercicio, o el mismo grupo de tendón, no se entrena dos días seguidos.
+  - Con sparring el domingo cuenta como día duro para todos los grupos. Por eso el sábado es descanso total y el lunes solo lleva trabajo ligero (Cupping al 50% y pulgar).
+  - Máximo 3 ejercicios por sesión y siempre hay un día de descanso completo.
+  - Cada ciclo termina con una semana de **descarga** (alrededor de un 40% menos de series).
+- **Brazo débil:** si en los últimos 30 días un brazo tiene al menos un 8% menos de rango o tiempo, ese brazo recibe una serie extra.
+- Las series, repeticiones, descansos y el ciclo de 4 semanas son sugerencias generales nuestras, no de tu entrenador.
+
+Ejemplos de semana (S1):
+
+**Con sparring, 5 días**
+| Día | Ejercicios |
+|---|---|
+| Lunes | Cupping (ligero), Pulgar (ligero) |
+| Martes | Retención de dedos, Rising, Aducción de muñeca, Pulgar |
+| Miércoles | Cupping, Pronación, Supinación, Pulgar |
+| Jueves | Side pressure, Bloque / Up pressure, Rising, Pulgar |
+| Viernes | Cupping, Retención de dedos, Pronación, Pulgar |
+| Sábado | Descanso |
+| Domingo | Sparring |
+
+**Sin sparring, 6 días**
+| Día | Ejercicios |
+|---|---|
+| Lunes | Cupping, Rising, Bloque / Up pressure, Pulgar |
+| Martes | Retención de dedos, Pronación, Supinación, Pulgar |
+| Miércoles | Cupping, Aducción de muñeca, Pulgar |
+| Jueves | Side pressure, Supinación, Pronación, Pulgar |
+| Viernes | Cupping, Rising, Aducción de muñeca, Pulgar |
+| Sábado | Retención de dedos, Bloque / Up pressure, Side pressure, Pulgar |
+| Domingo | Descanso |
+
+Si tienes menos días, el plan sigue cumpliendo las reglas pero avisa de lo que no llega a la guía (por ejemplo, Cupping con solo 2 días).
+
+## Límites conocidos
 - La pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta.
 - Una app web no puede avisarte con la app cerrada. Por eso el recordatorio es un evento semanal para tu calendario.
 - El brazo completo tiene que verse en la imagen. Si no, la medida sale mal.
