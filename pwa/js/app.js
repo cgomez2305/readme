@@ -81,6 +81,14 @@ window.addEventListener('popstate', () => {
 
 on(tabsEl, { '[data-tab]': (el) => { if (!overlay.hidden) closeOverlayNow(); api.go(el.dataset.tab); } });
 
+// MediaPipe tries to send anonymous usage statistics to Google. Nothing should leave the phone,
+// so that request is answered locally (the Content-Security-Policy in index.html blocks it as well).
+const realFetch = window.fetch.bind(window);
+window.fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input?.url ?? '';
+  return url.includes('odml.pa.googleapis.com') ? Promise.resolve(new Response(null, { status: 204 })) : realFetch(input, init);
+};
+
 // ---- install prompt ---------------------------------------------------------------------------
 const installEl = document.getElementById('install');
 let deferredPrompt = null;

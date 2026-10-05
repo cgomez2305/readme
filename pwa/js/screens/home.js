@@ -1,7 +1,7 @@
 import { state, subscribe, pickExercise, setsToday, todayPlanned } from '../state.js';
-import { exerciseById } from '../exercises.js';
+import { exerciseById, isHold } from '../exercises.js';
 import {
-  trainingDaysInWeek, weeklyStreak, rangeTrend, formatDay, formatTime, weekdayName, setAvgRange, setAvgTempo, fmtKg,
+  trainingDaysInWeek, weeklyStreak, rangeTrend, holdTrend, formatDay, formatTime, weekdayName, setAvgRange, setAvgTempo, fmtKg,
 } from '../analysis.js';
 import { esc, eyebrow, pill, on } from '../ui.js';
 import { trendChart } from '../charts.js';
@@ -17,7 +17,7 @@ export function mount(root, api) {
     const goal = state.plan.goal;
     const streak = weeklyStreak(state.sets, goal, now);
     const last = state.sets[0];
-    const trend = rangeTrend(state.sets, ex.id);
+    const trend = isHold(ex) ? holdTrend(state.sets, ex.id) : rangeTrend(state.sets, ex.id);
     const name = displayName().split(' ')[0];
     const done = setsToday(ex.id);
     const pct = goal ? Math.min(1, days / goal) : 0;
@@ -56,11 +56,13 @@ export function mount(root, api) {
           <div class="row"><div class="grow bold" style="font-size:16px">Última serie</div><span class="muted tiny">${formatDay(new Date(last.at))} · ${formatTime(new Date(last.at))}</span></div>
           <div class="muted small" style="margin:4px 0 12px">${esc(exerciseById(last.ex).name)} · brazo ${armLabel(last.arm).toLowerCase()}</div>
           <div class="grid4">
-            ${[['Reps', last.reps.length], ['Rango', `${Math.round(setAvgRange(last))}°`], ['Tempo', `${(setAvgTempo(last) / 1000).toFixed(1)} s`], ['Fatiga', last.fat ? `Rep ${last.fat}` : 'No']]
+            ${(isHold(exerciseById(last.ex))
+              ? [['Tiempo', `${Math.round(last.dur / 1000)} s`], ['Muñeca', last.sd == null ? '--' : `±${last.sd}°`], ['Peso', `${fmtKg(last.kg)} kg`], ['Brazo', armLabel(last.arm)]]
+              : [['Reps', last.reps.length], ['Rango', `${Math.round(setAvgRange(last))}°`], ['Tempo', `${(setAvgTempo(last) / 1000).toFixed(1)} s`], ['Fatiga', last.fat ? `Rep ${last.fat}` : 'No']])
               .map(([l, v]) => `<div><div class="muted tiny">${l}</div><div style="font-family:var(--display);font-weight:700;font-size:15px">${v}</div></div>`).join('')}
           </div>
         </div>
-        ${trend.length > 1 ? `<div class="glass"><div class="bold" style="margin-bottom:10px">Rango en ${esc(ex.name.toLowerCase())}</div>${trendChart(trend)}</div>` : ''}`
+        ${trend.length > 1 ? `<div class="glass"><div class="bold" style="margin-bottom:10px">${isHold(ex) ? 'Tiempo bajo tensión' : 'Rango'} en ${esc(ex.name.toLowerCase())}</div>${trendChart(trend, { unit: isHold(ex) ? ' s' : '°' })}</div>` : ''}`
       : `<div class="glass muted">Aquí verás tu progreso. Graba tu primera serie en Analizar y se guardará con su informe.</div>`}
     </div>`;
   };

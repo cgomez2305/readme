@@ -62,12 +62,15 @@ export function readArm(landmarks, arm, width, height, minVisibility = 0.5) {
   };
 }
 
-/** Draws the arm skeleton. p is normalised; the canvas must cover exactly the image area. */
-export function drawArm(ctx, p, joint, angle) {
+/**
+ * Draws the arm skeleton. p is normalised; the canvas must cover exactly the image area.
+ * mirror = true flips x, for a selfie view that is shown mirrored (the angle label is never mirrored).
+ */
+export function drawArm(ctx, p, joint, angle, mirror = false) {
   const { width: w, height: h } = ctx.canvas;
   ctx.clearRect(0, 0, w, h);
   if (!p) return;
-  const pt = (i) => [p[i * 2] * w, p[i * 2 + 1] * h];
+  const pt = (i) => [(mirror ? 1 - p[i * 2] : p[i * 2]) * w, p[i * 2 + 1] * h];
   const [s, e, wr, ix] = [pt(0), pt(1), pt(2), pt(3)];
   const grad = ctx.createLinearGradient(0, h, w, 0);
   grad.addColorStop(0, '#FF8A4C');

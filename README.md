@@ -11,19 +11,39 @@ App web instalable (PWA) que analiza tus ejercicios de armwrestling con la cáma
 Necesita la cámara (la app pide permiso la primera vez). Después de la primera visita funciona sin conexión, incluido el análisis.
 
 ## Qué hace
-- **Analizar:** cámara con guía de encuadre, aviso de luz baja y de brazo fuera de cuadro. Detecta el brazo en el propio móvil, mide el ángulo, cuenta repeticiones y graba el vídeo.
+- **Analizar:** cámara con aviso de luz baja y de brazo fuera de cuadro. Detecta el brazo en el propio móvil, mide el ángulo, cuenta repeticiones y graba el vídeo.
+- **Cámara a elegir:** usa la **cámara frontal (selfie)** por defecto, para que te veas mientras entrenas. Se puede cambiar a la trasera, o elegir un lente concreto si el móvil tiene varios. La elección se recuerda.
 - **Informe de serie:** rango, tempo, repetición donde empieza la fatiga (el rango baja un 15% o el tempo sube un 25% frente a las 3 primeras reps; necesita 5 reps) y consejos.
 - **Cámara lenta:** revisión a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
-- **Progreso:** semana, gráficas de rango y peso por ejercicio, comparación brazo derecho contra izquierdo, historial y dolor reportado.
-- **Ejercicios:** press lateral, pronación, supinación, cup, rising y back pressure, cada uno con su articulación medida, objetivos y consejos de cámara. Los umbrales son valores iniciales y hay que ajustarlos con datos reales.
+- **Progreso:** semana, gráficas por ejercicio, comparación brazo derecho contra izquierdo, historial y dolor reportado.
 - **Descanso:** temporizador con sonido y vibración, y peso por serie.
 - **Plan:** meta semanal, ejercicio por día, racha de semanas y exportación al calendario con aviso.
 - **Equipo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase (ver abajo).
 
+## Ejercicios y guía básica
+Frecuencia e intensidad son recomendaciones generales de un entrenador de armwrestling. No sustituyen a un entrenador ni a un médico.
+
+| Ejercicio | Frecuencia por semana | Qué mide la app |
+|---|---|---|
+| Rising | máx. 2 | ángulo de muñeca y repeticiones |
+| Pronación | máx. 2 | ángulo de muñeca (indirecto) |
+| Supinación | máx. 2 | ángulo de muñeca (indirecto) |
+| Cupping | 3 a 4, según la intensidad | ángulo de muñeca y repeticiones |
+| Aducción de muñeca | máx. 2 | ángulo de muñeca y repeticiones |
+| Retención de dedos | 2 a 3 | tiempo bajo tensión y firmeza de la muñeca |
+| Pulgar | se puede todos los días | tiempo bajo tensión y firmeza de la muñeca |
+| Side pressure | máx. 1 si hay sparring, 2 si no | ángulo de codo y repeticiones |
+| Bloque / Up pressure | máx. 2 | ángulo de codo y repeticiones |
+
+- **Intensidad:** trabajar con el **60% del 1RM**, y en side pressure con el **30-40%**. Defines tu 1RM por ejercicio en Analizar y la app te dice cuántos kg usar.
+- **Nunca ir al máximo ni al fallo:** la tendinitis aparece al fallo. La app avisa si usas más del 10% por encima de la guía, si pasas del 90% de tu 1RM y cuando detecta fatiga en la serie.
+- **Frecuencia:** Analizar avisa cuando ya llegaste al máximo semanal del ejercicio, y Plan avisa si le asignas demasiados días. Con el interruptor de sparring, side pressure baja a una vez por semana.
+
 ### Límites conocidos
 - La pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta.
 - Una app web no puede avisarte con la app cerrada. Por eso el recordatorio es un evento semanal para tu calendario.
-- El ángulo supone el móvil de lado y con el brazo completo a la vista. Si no, la medida sale mal.
+- El brazo completo tiene que verse en la imagen. Si no, la medida sale mal.
+- Los umbrales de cada ejercicio (qué cuenta como repetición, rango y tempo) son valores iniciales y hay que ajustarlos con datos reales.
 - La app guarda las series en el navegador del móvil. Si borras los datos del sitio o desinstalas, se pierden (con un grupo conectado se conserva el resumen en la nube).
 
 ## Privacidad
@@ -60,10 +80,7 @@ Para probar en el móvil hace falta https, que da GitHub Pages.
 
 ## Identidad
 - **Nombre:** Fulcro, el punto de apoyo de la palanca; en armwrestling, el codo sobre el pad.
-- **Logo:** `design/logo.svg` (pivote, antebrazo y arco del ángulo medido).
+- **Logo:** `pwa/icons/icon.svg` (pivote, antebrazo y arco del ángulo medido).
 - **Paleta:** cobre `#FF8A4C` (acción), turquesa `#3FE0C5` (ángulo bueno), ámbar `#FFB347` (atención), grafito `#0E1118`.
 - **Tipografías:** Unbounded (títulos) y Figtree (texto), incluidas en `pwa/fonts` (licencia SIL OFL).
 - **Modelo de negocio:** primero gratis para el grupo de entrenamiento; después plan Pro por suscripción.
-
-## App Android nativa (archivada)
-El proyecto Flutter (`lib/`, `android/`) queda en el repo como primera versión. No es la versión principal: en algunos móviles se cerraba al abrir. Se compila a mano desde la pestaña Actions con el workflow **Build APK**.

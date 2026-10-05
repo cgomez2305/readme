@@ -77,7 +77,7 @@ input[type=text], input[type=email], input[type=password], input[type=number], t
   width: 100%; padding: 12px 14px; border-radius: 14px; border: 0; background: var(--glass); color: var(--text); font: inherit;
 }
 textarea { resize: vertical; min-height: 76px; }
-select { appearance: none; }
+select { appearance: none; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239AA3B5' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 select option { background: var(--panel); color: var(--text); }
 input[type=checkbox].switch { appearance: none; width: 48px; height: 28px; border-radius: 999px; background: var(--glass-strong); position: relative; cursor: pointer; flex: none; }
 input[type=checkbox].switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
@@ -130,3 +130,6 @@ svg.chart text { font-family: var(--body); fill: var(--muted); font-size: 10px; 
 /* record button stays reachable above the tab bar */
 .sticky-cta { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); z-index: 5; padding-top: 14px; background: linear-gradient(to bottom, transparent, var(--panel) 45%); }
 .sticky-cta .btn.ghost { background: #232838; }
+.stage video.mirror { transform: scaleX(-1); }
+
+.stage .flip { position: absolute; top: 8px; right: 8px; z-index: 4; width: 40px; height: 40px; background: rgba(14,17,24,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--edge); color: var(--text); }

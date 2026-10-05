@@ -1,4 +1,4 @@
-import { exercises, exerciseById } from '../exercises.js';
+import { exercises, exerciseById, isHold } from '../exercises.js';
 import { formatDay } from '../analysis.js';
 import { esc, eyebrow, pill, chips, seg, on, toast } from '../ui.js';
 import * as cloud from '../cloud.js';
@@ -61,12 +61,14 @@ export function mount(root) {
             <div style="text-align:right"><div class="bold">${m.daysWeek} días</div><div class="muted tiny">${m.setsWeek} series</div></div></div>`).join('')}</div>`;
       } else {
         const list = await cloud.exerciseStats(exId);
-        const top = Math.max(0, ...list.map((m) => m.avgRange));
+        const hold = isHold(exerciseById(exId));
+        const value = (m) => (hold ? m.avgTempoMs / 1000 : m.avgRange); // hold sets upload their time under tension
+        const top = Math.max(0, ...list.map(value));
         statsHtml = `${chips('texid', exercises.map((e) => [e.id, e.name]), exId)}
-          <div class="glass" style="margin-top:12px"><div class="bold" style="margin-bottom:12px">Rango medio · últimos 30 días</div>
+          <div class="glass" style="margin-top:12px"><div class="bold" style="margin-bottom:12px">${hold ? 'Tiempo bajo tensión medio' : 'Rango medio'} · últimos 30 días</div>
           ${list.map((m) => `<div class="row" style="margin-bottom:8px"><div style="width:76px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</div>
-            <div class="grow bar-track"><div class="bar-fill" style="width:${top ? (m.avgRange / top) * 100 : 0}%"></div></div>
-            <div class="muted tiny" style="width:96px;text-align:right">${m.sets === 0 ? 'sin datos' : `${Math.round(m.avgRange)}° · ${m.bestKg} kg`}</div></div>`).join('')}</div>`;
+            <div class="grow bar-track"><div class="bar-fill" style="width:${top ? (value(m) / top) * 100 : 0}%"></div></div>
+            <div class="muted tiny" style="width:96px;text-align:right">${m.sets === 0 ? 'sin datos' : `${Math.round(value(m))}${hold ? ' s' : '°'} · ${m.bestKg} kg`}</div></div>`).join('')}</div>`;
       }
     } catch {
       const err = '<div class="glass muted small">No se pudo cargar. Revisa tu internet y pulsa Actualizar.</div>';

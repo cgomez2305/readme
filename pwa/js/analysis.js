@@ -1,6 +1,9 @@
 // Pure analysis code: angles, repetition tracking, fatigue, summaries and progress.
 // A set record is a plain object:
-//   { id, ex, arm:'left'|'right', kg, at:ISO, dur, reps:[{s,e,mn,mx,w?}], fat?, marks:[], video:bool, note, pz?, pl }
+//   { id, ex, arm:'left'|'right', kg, at:ISO, dur, reps:[{s,e,mn,mx,w?}], fat?, marks:[], video:bool, note, pz?, pl,
+//     cam?:'user'|'environment', sd? (hold sets: wrist steadiness in degrees) }
+
+import { intensityStatus, recommendedKg, intensityText, freqMax } from './exercises.js';
 
 export const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 export const stdDev = (xs) => {
@@ -129,7 +132,7 @@ export function summarize(reps, ex) {
     }
     if (fatigue != null) {
       tips.push({ level: 'warn', title: `Fatiga desde la repetición ${fatigue}`,
-        text: 'Desde ahí el rango baja o el tempo se alarga. Considera cortar la serie ahí o bajar el peso.' });
+        text: 'Desde ahí el rango baja o el tempo se alarga. Corta la serie ahí o baja el peso: llegar al fallo es lo que provoca las tendinitis.' });
     }
   }
   return {
@@ -191,12 +194,14 @@ export const rangeTrend = (sets, exId, arm) =>
 export const weightTrend = (sets, exId) =>
   perDay(sets.filter((s) => s.ex === exId), (s) => s.kg).map((d) => ({ date: d.date, value: Math.max(...d.vals) }));
 
-export function compareArms(sets, exId, now, days = 30) {
+/** For hold exercises pass hold=true: the compared value is the time under tension (in seconds) instead of the range. */
+export function compareArms(sets, exId, now, days = 30, hold = false) {
   const since = new Date(now.getTime() - days * 86400000);
-  const pick = (a) => sets.filter((s) => s.ex === exId && s.arm === a && s.reps.length && when(s) > since);
+  const pick = (a) => sets.filter((s) => s.ex === exId && s.arm === a && (hold ? s.dur > 0 : s.reps.length) && when(s) > since);
   const l = pick('left'), r = pick('right');
+  const val = hold ? (s) => s.dur / 1000 : setAvgRange;
   const out = {
-    leftRange: mean(l.map(setAvgRange)), rightRange: mean(r.map(setAvgRange)),
+    leftRange: mean(l.map(val)), rightRange: mean(r.map(val)),
     leftTempoMs: mean(l.map(setAvgTempo)), rightTempoMs: mean(r.map(setAvgTempo)),
     leftSets: l.length, rightSets: r.length,
   };
@@ -216,3 +221,57 @@ export const monthShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago
 export const formatDay = (d) => `${d.getDate()} ${monthShort[d.getMonth()]}`;
 export const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 export const fmtKg = (kg) => `${Number.isInteger(kg) ? kg : kg}`;
+
+/** Average time under tension per training day for a hold exercise, in seconds. */
+export const holdTrend = (sets, exId) =>
+  perDay(sets.filter((s) => s.ex === exId), (s) => (s.dur > 0 ? s.dur / 1000 : null)).map((d) => ({ date: d.date, value: mean(d.vals) }));
+
+/** Distinct days of the week containing ref on which this exercise was trained. */
+export function weeklyDaysFor(sets, exId, ref) {
+  const start = weekStart(ref), end = addDays(start, 7);
+  return new Set(sets.filter((s) => s.ex === exId && when(s) >= start && when(s) < end).map((s) => dayKey(when(s)))).size;
+}
+
+/** Summary of an isometric set: time under tension and wrist steadiness (sd in degrees, lower is steadier). */
+export function summarizeHold(durMs, sd) {
+  const seconds = durMs / 1000;
+  const tips = [];
+  if (seconds < 5) {
+    tips.push({ level: 'info', title: 'Tiempo corto', text: 'Con menos de 5 segundos no se puede valorar la serie.' });
+  } else {
+    tips.push({ level: 'info', title: 'Tiempo bajo tensión', text: `${Math.round(seconds)} s. Busca series que puedas repetir sin perder la forma, sin llegar al fallo.` });
+    if (sd != null) {
+      if (sd <= 5) tips.push({ level: 'good', title: 'Muñeca firme', text: `La muñeca se movió ±${sd.toFixed(1)}° durante la serie.` });
+      else if (sd <= 10) tips.push({ level: 'info', title: 'Muñeca algo inestable', text: `La muñeca se movió ±${sd.toFixed(1)}°. Intenta mantenerla neutra.` });
+      else tips.push({ level: 'warn', title: 'Muñeca inestable', text: `La muñeca se movió ±${sd.toFixed(1)}°. Baja la carga: suele ser señal de que estás cerca del fallo.` });
+    }
+  }
+  return { seconds, sd, tips };
+}
+
+const kgText = (v) => `${Math.round(v * 10) / 10}`;
+
+/** Tips about the weight used compared with the 1RM guideline. Empty without a 1RM. */
+export function intensityTips(ex, kg, oneRm) {
+  const st = intensityStatus(ex, kg, oneRm);
+  const rec = recommendedKg(ex, oneRm);
+  if (st === 'max') {
+    return [{ level: 'warn', title: 'Cerca de tu máximo',
+      text: `Usaste ${kgText(kg)} kg, más del 90% de tu 1RM. No entrenes al máximo: es lo que provoca las lesiones. Trabaja con ${kgText(rec.low)}-${kgText(rec.high)} kg.` }];
+  }
+  if (st === 'high') {
+    return [{ level: 'warn', title: 'Peso por encima de lo recomendado',
+      text: `Para ${ex.name} la guía es ${intensityText(ex)} (${kgText(rec.low)}-${kgText(rec.high)} kg con tu 1RM de ${kgText(oneRm)} kg). Usaste ${kgText(kg)} kg.` }];
+  }
+  return st === 'ok' ? [{ level: 'good', title: 'Peso dentro de la guía', text: `${kgText(kg)} kg está dentro de ${intensityText(ex)}.` }] : [];
+}
+
+/** Warns when this exercise was already trained on more days than recommended this week. */
+export function frequencyTips(ex, daysThisWeek, sparring = false) {
+  const max = freqMax(ex, sparring);
+  if (daysThisWeek > max) {
+    return [{ level: 'warn', title: 'Frecuencia semanal superada',
+      text: `Es el día ${daysThisWeek} de esta semana con ${ex.name} y la guía es máx. ${max}. Deja descansar ese tendón.` }];
+  }
+  return [];
+}

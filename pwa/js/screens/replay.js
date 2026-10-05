@@ -12,6 +12,7 @@ export function mount(root, api, { id }) {
   const ex = exerciseById(set?.ex);
   let url = null, frames = [], speed = 0.5, skeleton = true, raf = 0, alive = true, dur = (set?.dur ?? 1000);
   let error = null;
+  const mirror = set?.cam === 'user'; // selfie recordings are shown mirrored, like the live view
 
   root.innerHTML = `<div class="col">
     <div class="row"><button class="icon-btn" id="p-back" aria-label="Volver">${icon('back')}</button><div class="title" style="font-size:18px">${esc(ex.name)}</div></div>
@@ -33,6 +34,13 @@ export function mount(root, api, { id }) {
     video.playbackRate = speed;
     // MediaRecorder files report an infinite duration; seeking far forces the browser to compute it.
     video.addEventListener('loadedmetadata', () => {
+      if (video.videoWidth && video.videoHeight) {
+        const st = body.querySelector('.stage'), cv = body.querySelector('canvas');
+        st.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+        if (video.videoWidth > video.videoHeight) st.style.maxWidth = '480px';
+        cv.width = 360;
+        cv.height = Math.round((360 * video.videoHeight) / video.videoWidth);
+      }
       if (video.duration === Infinity || Number.isNaN(video.duration)) {
         video.currentTime = 1e101;
         video.addEventListener('timeupdate', function fix() {
@@ -66,7 +74,7 @@ export function mount(root, api, { id }) {
     dur = d || dur;
     const ms = video.currentTime * 1000;
     const ctx = cv.getContext('2d');
-    if (skeleton) { const f = nearest(ms); drawArm(ctx, f?.p, ex.joint, f?.a); } else ctx.clearRect(0, 0, cv.width, cv.height);
+    if (skeleton) { const f = nearest(ms); drawArm(ctx, f?.p, ex.joint, f?.a, mirror); } else ctx.clearRect(0, 0, cv.width, cv.height);
     const pct = Math.min(100, (ms / dur) * 100);
     const fill = body.querySelector('.fill'), knob = body.querySelector('.knob'), time = body.querySelector('#p-time');
     if (fill) { fill.style.width = `${pct}%`; knob.style.left = `${pct}%`; time.textContent = `${fmt(ms)} / ${fmt(dur)}`; }
@@ -78,7 +86,7 @@ export function mount(root, api, { id }) {
     if (error) { body.innerHTML = `<div class="glass muted">${esc(error)}</div>`; return; }
     const fm = fatMs();
     body.innerHTML = `<div class="stack">
-      <div class="stage" style="max-width:320px"><video playsinline muted loop></video><canvas width="360" height="640"></canvas></div>
+      <div class="stage" style="max-width:320px"><video playsinline muted loop class="${mirror ? 'mirror' : ''}"></video><canvas width="360" height="640"></canvas></div>
       <div class="timeline" id="p-line"><div class="track"></div><div class="fill"></div>
         ${set.reps.map((r) => `<span class="tick" style="left:${(r.s / dur) * 100}%"></span>`).join('')}
         ${fm != null ? `<span class="mark" style="left:${(fm / dur) * 100}%;background:var(--warn)"></span>` : ''}

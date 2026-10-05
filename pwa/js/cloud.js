@@ -119,7 +119,7 @@ export async function pushSet(set) {
       started_at: new Date(set.at).toISOString(),
       reps: set.reps.length,
       avg_range: setAvgRange(set),
-      avg_tempo_ms: setAvgTempo(set),
+      avg_tempo_ms: set.reps.length ? setAvgTempo(set) : set.dur, // hold sets: time under tension
       fatigue_rep: set.fat ?? null,
       pain_zone: set.pz ?? null,
       pain_level: set.pl ?? 0,

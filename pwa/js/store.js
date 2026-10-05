@@ -22,7 +22,7 @@ function writeJson(key, value) {
   }
 }
 
-export const defaultPlan = { goal: 3, days: {}, hour: 19, minute: 0 };
+export const defaultPlan = { goal: 3, days: {}, hour: 19, minute: 0, sparring: false };
 
 export const loadSets = () => {
   const list = readJson(LS_SETS, []);

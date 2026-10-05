@@ -1,8 +1,10 @@
 // Report of one series. A new series offers Save / Discard; a saved one allows editing notes
 // and pain, watching the video and deleting.
-import { addSet, updateSet, deleteSet } from '../state.js';
-import { exerciseById, jointLabel, armLabel, painZones } from '../exercises.js';
-import { summarize, repRange, repDuration, formatDay, formatTime, fmtKg } from '../analysis.js';
+import { state, addSet, updateSet, deleteSet } from '../state.js';
+import { exerciseById, jointLabel, armLabel, painZones, isHold } from '../exercises.js';
+import {
+  summarize, summarizeHold, intensityTips, frequencyTips, weeklyDaysFor, repRange, repDuration, formatDay, formatTime, fmtKg,
+} from '../analysis.js';
 import { esc, eyebrow, metric, seg, on, icon, toast } from '../ui.js';
 import { repBars } from '../charts.js';
 
@@ -10,8 +12,13 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
   const ex = exerciseById(set.ex);
   let saving = false;
 
+  const hold = isHold(ex);
   const render = () => {
-    const s = summarize(set.reps, ex);
+    const s = hold ? { reps: 0, fatigueRep: null, tips: [] } : summarize(set.reps, ex);
+    const h = hold ? summarizeHold(set.dur, set.sd) : null;
+    // Guidelines: weight against the 1RM and weekly frequency, counted up to the day of this set.
+    const days = weeklyDaysFor(isNew ? [...state.sets, set] : state.sets, ex.id, new Date(set.at));
+    const tips = [...(h ? h.tips : s.tips), ...intensityTips(ex, set.kg, state.oneRm[ex.id]), ...frequencyTips(ex, days, state.plan.sparring)];
     const fatIdx = s.fatigueRep == null ? undefined : s.fatigueRep - 1;
     const tipIcon = { good: ['✓', 'var(--teal)'], warn: ['!', 'var(--warn)'], info: ['i', 'var(--muted)'] };
     const note = root.querySelector('#r-note')?.value ?? set.note;
@@ -21,10 +28,14 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
       <div><div class="title">${esc(ex.name)}</div>
         <div class="muted small" style="margin-top:4px">Brazo ${armLabel(set.arm).toLowerCase()} · ${fmtKg(set.kg)} kg · ${Math.round(set.dur / 1000)} s</div></div>
       <div class="grid2">
-        ${metric('Repeticiones', String(s.reps))}
-        ${metric('Rango medio', s.reps ? `${Math.round(s.avgRange)}°` : '--', s.reps ? (s.avgRange >= ex.minRange ? 'En objetivo' : 'Corto') : '', s.avgRange >= ex.minRange ? 'good' : 'warn')}
-        ${metric('Tempo por rep', s.reps ? `${(s.avgTempoMs / 1000).toFixed(1)} s` : '--')}
-        ${metric('Fatiga', s.fatigueRep == null ? 'No' : `Rep ${s.fatigueRep}`, s.reps < 5 ? 'Necesita 5 reps' : '', 'mute')}
+        ${hold ? `
+          ${metric('Tiempo bajo tensión', `${Math.round(h.seconds)} s`)}
+          ${metric('Firmeza de muñeca', h.sd == null ? '--' : `±${h.sd.toFixed(1)}°`, h.sd == null ? '' : h.sd <= 5 ? 'Firme' : h.sd <= 10 ? 'Algo inestable' : 'Inestable', h.sd == null ? 'mute' : h.sd <= 5 ? 'good' : 'warn')}`
+        : `
+          ${metric('Repeticiones', String(s.reps))}
+          ${metric('Rango medio', s.reps ? `${Math.round(s.avgRange)}°` : '--', s.reps ? (s.avgRange >= ex.minRange ? 'En objetivo' : 'Corto') : '', s.avgRange >= ex.minRange ? 'good' : 'warn')}
+          ${metric('Tempo por rep', s.reps ? `${(s.avgTempoMs / 1000).toFixed(1)} s` : '--')}
+          ${metric('Fatiga', s.fatigueRep == null ? 'No' : `Rep ${s.fatigueRep}`, s.reps < 5 ? 'Necesita 5 reps' : '', 'mute')}`}
       </div>
       ${s.reps ? `<div class="glass">
         <div class="bold" style="margin-bottom:12px">Rango por repetición (${jointLabel(ex).toLowerCase()})</div>
@@ -32,7 +43,7 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
         <div class="bold" style="margin:16px 0 12px">Duración por repetición</div>
         ${repBars(set.reps.map((r) => repDuration(r) / 1000), { unit: ' s', decimals: 1, height: 90, highlightFrom: fatIdx })}
       </div>` : ''}
-      ${s.tips.map((t) => `<div class="glass row top"><div class="day" style="margin:0;background:var(--glass-strong);color:${tipIcon[t.level][1]};width:34px;height:34px;border-radius:12px;flex:none">${tipIcon[t.level][0]}</div>
+      ${tips.map((t) => `<div class="glass row top"><div class="day" style="margin:0;background:var(--glass-strong);color:${tipIcon[t.level][1]};width:34px;height:34px;border-radius:12px;flex:none">${tipIcon[t.level][0]}</div>
         <div><div class="bold">${esc(t.title)}</div><div class="muted small">${esc(t.text)}</div></div></div>`).join('')}
       <div class="glass stack">
         <div class="bold">¿Sentiste dolor?</div>
