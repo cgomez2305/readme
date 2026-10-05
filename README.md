@@ -110,3 +110,6 @@ Solo se suben los resúmenes de cada serie (ejercicio, peso, reps, rango, tempo,
 
 ## Pendiente
 Firmar el APK con una clave propia antes de publicar en Google Play, iOS, y la comparación con referencias de profesionales (Pro).
+
+## Fuentes
+Figtree y Unbounded van incluidas en `assets/fonts` (licencia SIL Open Font License, ver los archivos `OFL-*.txt`), así que la app no necesita internet para verse bien.

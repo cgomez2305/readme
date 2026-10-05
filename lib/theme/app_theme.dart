@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class FulcroColors {
   static const ink = Color(0xFF07080C);
@@ -23,7 +22,8 @@ class FulcroColors {
 
 ThemeData buildTheme() {
   final base = ThemeData.dark(useMaterial3: true);
-  final body = GoogleFonts.figtreeTextTheme(base.textTheme).apply(
+  final body = base.textTheme.apply(
+    fontFamily: 'Figtree',
     bodyColor: FulcroColors.text,
     displayColor: FulcroColors.text,
   );
@@ -38,5 +38,12 @@ ThemeData buildTheme() {
   );
 }
 
-TextStyle displayStyle({double size = 24, FontWeight weight = FontWeight.w700}) =>
-    GoogleFonts.unbounded(fontSize: size, fontWeight: weight, color: FulcroColors.text);
+/// Wide display face for titles and big numbers. Unbounded is a variable font,
+/// so the weight is set through its `wght` axis.
+TextStyle displayStyle({double size = 24, FontWeight weight = FontWeight.w700}) => TextStyle(
+      fontFamily: 'Unbounded',
+      fontSize: size,
+      fontWeight: weight,
+      fontVariations: [FontVariation('wght', weight.value.toDouble())],
+      color: FulcroColors.text,
+    );
