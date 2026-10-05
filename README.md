@@ -35,12 +35,18 @@ Los vídeos de YouTube/Instagram tienen derechos de autor. Para un uso personal 
 - **v0.5** Plan de entrenamiento adaptativo según debilidades detectadas.
 - **Futuro** Sensores externos (dinamómetro BLE) para correlacionar fuerza y técnica.
 
-## Stack propuesto
-- **App:** Flutter o React Native (iOS + Android con un solo código).
-- **Pose en dispositivo:** MediaPipe Pose (privacidad y sin coste de servidor).
-- **Backend (opcional):** Python + FastAPI para entrenar modelos y guardar referencias.
-- **ML:** PyTorch para el clasificador de técnica; DTW para comparar secuencias.
-- **Datos:** Supabase/Firebase para usuarios e historial.
+## Stack elegido
+- **App:** Flutter (Dart). Un solo código para Android e iOS, genera el APK directamente y tiene buen rendimiento con cámara y gráficos propios.
+- **Pose en el dispositivo:** ML Kit Pose Detection (`google_mlkit_pose_detection`), 33 puntos del cuerpo sin servidor ni coste por uso.
+- **Backend:** Supabase (Postgres, autenticación, almacenamiento). Código abierto y exportable, sin dependencia de un solo proveedor.
+- **ML propio (más adelante):** Python + PyTorch, offline. El modelo entrenado se exporta a TFLite y se ejecuta en el móvil.
+- **Suscripciones (fase Pro):** RevenueCat sobre Google Play Billing y App Store.
+- **CI/CD:** GitHub Actions para compilar APK/AAB en cada versión.
+
+## Distribución
+1. **Ahora:** APK firmado, instalado directamente en los móviles del grupo (`flutter build apk --release`).
+2. **Después:** Google Play con pruebas cerradas, usando AAB.
+3. **Con suscripción:** Play Store y App Store con RevenueCat.
 
 ## Diseño
 Interfaz oscura, tipografía fuerte y esqueleto en neón sobre el vídeo; prototipo en Figma antes de programar.
