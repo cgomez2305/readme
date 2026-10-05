@@ -130,16 +130,18 @@ export function mount(root, api) {
       <div class="row"><span class="muted small" style="width:78px">Detección</span><div class="grow">${seg('det', [['lite', 'Rápida'], ['full', 'Precisa']], state.detector)}</div></div>
       <div class="muted tiny">Si no cuenta repeticiones, sube la sensibilidad. La detección precisa es más lenta y usa más batería.</div>`;
   }
-  /** The newest set saved today, with a quick way to delete a recording that did not turn out well. */
+  /** Sets saved today for the exercises of the day (all of today's sets when there is no plan), each with a way to delete it. */
   function renderLast() {
     const n = new Date();
-    const last = state.sets.find((x) => {
+    const ids = planRestricted() ? new Set((todaySession()?.items ?? []).map((i) => i.ex)) : null;
+    const list = state.sets.filter((x) => {
       const d = new Date(x.at);
-      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate() && (!ids || ids.has(x.ex));
     });
-    $('#a-last').innerHTML = last && !recording
-      ? `<div class="glass row" style="padding:10px 14px"><div class="grow"><div class="tiny muted">Última serie guardada hoy</div><div class="small">${esc(setLine(last))}</div></div>
-          <button class="btn ghost small" data-lastdel="${esc(last.id)}">Eliminar</button></div>` : '';
+    $('#a-last').innerHTML = list.length && !recording
+      ? `<div class="glass"><div class="tiny muted" style="margin-bottom:6px">Series guardadas hoy</div>${list.slice(0, 12).map((x) => `
+          <div class="row" style="padding:6px 0;border-top:1px solid var(--edge)"><div class="grow small">${esc(setLine(x))}</div>
+          <button class="icon-btn" data-lastdel="${esc(x.id)}" aria-label="Eliminar serie" style="width:34px;height:34px">🗑</button></div>`).join('')}</div>` : '';
   }
   function renderRest() {
     const left = state.restLeft;

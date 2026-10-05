@@ -8,6 +8,7 @@ import {
 } from '../analysis.js';
 import { esc, eyebrow, metric, seg, on, icon, toast } from '../ui.js';
 import { repBars } from '../charts.js';
+import { confirmSheet } from './manage.js';
 
 export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved }) {
   const ex = exerciseById(set.ex);
@@ -114,9 +115,12 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
       if (isNew) onSaved?.();
     },
     '#r-replay': () => api.openReplay(set.id),
-    '#r-del': async () => {
-      if (!isNew) await deleteSet(set.id);
-      api.closeOverlay();
+    '#r-del': () => {
+      if (isNew) return api.closeOverlay();
+      confirmSheet({
+        title: '¿Eliminar esta serie?', text: 'Se borra también su vídeo. No se puede deshacer.',
+        onDone: () => { deleteSet(set.id); api.closeOverlay(); toast('Serie eliminada.'); },
+      });
     },
   });
   return offClick;

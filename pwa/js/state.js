@@ -183,7 +183,8 @@ export async function deleteSets(ids) {
   store.saveSets(state.sets);
   notify(); // the screen updates right away; the videos are cleaned up after
   deleteHook?.(ids);
-  await Promise.all(ids.map((id) => store.deleteMedia(id)));
+  // videos are cleaned up in the background so a slow or blocked IndexedDB never leaves the screen waiting
+  Promise.all(ids.map((id) => store.deleteMedia(id))).catch(() => {});
 }
 export const deleteSet = (id) => deleteSets([id]);
 export function updatePlan(patch) {

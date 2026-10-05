@@ -50,7 +50,8 @@ export function mount(root, api) {
     const days = trainingDaysInWeek(state.sets, now);
     const goal = state.plan.goal;
     const streak = weeklyStreak(state.sets, goal, now);
-    const last = state.sets[0];
+    const todayIds = hasPlan() ? new Set((todaySession()?.items ?? []).map((i) => i.ex)) : new Set();
+    const last = todayIds.size ? state.sets.find((x) => todayIds.has(x.ex)) : state.sets[0]; // on a training day, only that day's exercises
     const trend = isHold(ex) ? holdTrend(state.sets, ex.id) : rangeTrend(state.sets, ex.id);
     const name = displayName().split(' ')[0];
     const done = setsToday(ex.id);
