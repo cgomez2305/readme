@@ -2,6 +2,7 @@
 import { exercises, exerciseById, legacyIds } from './exercises.js';
 import * as store from './store.js';
 import { normalizePlan, gymDayCount, daysFromSessions, emptySessions } from './plans.js';
+import { resolveTargets, toRefReps } from './score.js';
 
 const prefs = store.loadPrefs();
 
@@ -32,6 +33,12 @@ export const state = {
   cam: prefs.cam === 'environment' ? 'environment' : 'user',
   deviceId: typeof prefs.deviceId === 'string' ? prefs.deviceId : '',
   oneRm: prefs.oneRm && typeof prefs.oneRm === 'object' ? prefs.oneRm : {},
+  sens: ['low', 'mid', 'high'].includes(prefs.sens) ? prefs.sens : 'mid', // repetition counting sensitivity
+  detector: prefs.detector === 'full' ? 'full' : 'lite', // arm detection model: fast or accurate
+  useRefs: prefs.useRefs !== false, // score against the reference profiles
+  models: store.loadModels(), // trained technique models, by exercise id
+  refs: store.loadRefs(), // references made on this phone (own series, uploaded videos)
+  remoteRefs: store.loadRemoteRefs(), // references shared by the group
   kg: Number.isFinite(prefs.kg) ? prefs.kg : 20,
   restSeconds: [60, 90, 120, 180].includes(prefs.restSeconds) ? prefs.restSeconds : 90,
   restLeft: null,
@@ -56,7 +63,7 @@ const notifyRest = () => restListeners.forEach((fn) => fn());
 const persistPrefs = () =>
   store.savePrefs({
     exerciseId: state.exerciseId, arm: state.arm, kg: state.kg, restSeconds: state.restSeconds,
-    cam: state.cam, deviceId: state.deviceId, oneRm: state.oneRm,
+    cam: state.cam, deviceId: state.deviceId, oneRm: state.oneRm, sens: state.sens, detector: state.detector, useRefs: state.useRefs,
   });
 
 export const currentExercise = () => exerciseById(state.exerciseId);
@@ -71,6 +78,22 @@ export function pickArm(arm) {
   persistPrefs();
   notify();
 }
+export function setSens(v) {
+  state.sens = v;
+  persistPrefs();
+  notify();
+}
+export function setDetector(v) {
+  state.detector = v === 'full' ? 'full' : 'lite';
+  persistPrefs();
+  notify();
+}
+export function setUseRefs(on) {
+  state.useRefs = Boolean(on);
+  persistPrefs();
+  notify();
+}
+
 /** Choose the front (user) or back (environment) camera. Clears any specific lens. */
 export function setCam(cam) {
   state.cam = cam === 'environment' ? 'environment' : 'user';
@@ -180,6 +203,64 @@ export function clearPlan() {
   store.savePlan(state.plan);
   notify();
 }
+
+// ---- references (the "training" data: profiles built from videos and from good series) -----------
+let refSavedHook = null, refDeletedHook = null;
+export const onRefSaved = (fn) => { refSavedHook = fn; };
+export const onRefDeleted = (fn) => { refDeletedHook = fn; };
+
+export const allRefs = () => {
+  const mine = new Set(state.refs.map((r) => r.id));
+  return [...state.refs, ...state.remoteRefs.filter((r) => !mine.has(r.id))];
+};
+
+export function addRef(ref) {
+  state.refs = [ref, ...state.refs.filter((r) => r.id !== ref.id)];
+  store.saveRefs(state.refs);
+  notify();
+  refSavedHook?.(ref);
+}
+export function deleteRef(id) {
+  state.refs = state.refs.filter((r) => r.id !== id);
+  store.saveRefs(state.refs);
+  notify();
+  refDeletedHook?.(id);
+}
+export function setRemoteRefs(list) {
+  state.remoteRefs = list;
+  store.saveRemoteRefs(list);
+  notify();
+}
+
+/** Reference made from one of the user's own sets (needs at least 3 repetitions with a curve). Null otherwise. */
+export function refFromSet(set, label = 'Mi serie') {
+  const reps = set.reps.filter((r) => r.c);
+  if (reps.length < 3) return null;
+  return { id: `set-${set.id}`, ex: set.ex, arm: set.arm, source: 'own', label, at: set.at, reps: toRefReps(reps) };
+}
+
+let modelSavedHook = null, modelDeletedHook = null;
+export const onModelSaved = (fn) => { modelSavedHook = fn; };
+export const onModelDeleted = (fn) => { modelDeletedHook = fn; };
+
+/** Keeps a trained model (from this phone or from the cloud). */
+export function setTrainedModel(model, { fromCloud = false } = {}) {
+  state.models = { ...state.models, [model.ex]: model };
+  store.saveModels(state.models);
+  notify();
+  if (!fromCloud) modelSavedHook?.(model);
+}
+export function deleteTrainedModel(exId) {
+  const { [exId]: _gone, ...rest } = state.models;
+  state.models = rest;
+  store.saveModels(rest);
+  notify();
+  modelDeletedHook?.(exId);
+}
+
+/** Scoring targets for an exercise from the references and the trained model (defaults when switched off). */
+export const targetsFor = (exId) =>
+  resolveTargets(exerciseById(exId), state.useRefs ? allRefs() : [], state.useRefs ? state.models[exId] ?? null : null);
 
 let cloudHook = null;
 export const onSetSaved = (fn) => {

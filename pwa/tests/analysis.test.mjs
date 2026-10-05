@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  jointAngle, RepTracker, Smoother, diagnoseSet, detectFatigue, summarize, weekStart, trainingDaysInWeek, weeklyStreak,
+  jointAngle, RepTracker, Smoother, AngleFilter, resample, diagnoseSet, detectFatigue, summarize, weekStart, trainingDaysInWeek, weeklyStreak,
   compareArms, painEvents, rangeTrend, setAvgRange,
 } from '../js/analysis.js';
 import { exerciseById, exercises, repDelta } from '../js/exercises.js';
@@ -79,10 +79,41 @@ test('wrist average inside a rep', () => {
   assert.ok(t.reps[0].w > 150 && t.reps[0].w < 180);
 });
 
-test('delta per exercise', () => {
-  assert.equal(repDelta(exerciseById('rising')), 10);
-  assert.equal(repDelta(exerciseById('side_pressure')), 25);
-  assert.ok(exercises.every((e) => repDelta(e) >= 8));
+test('delta per exercise: 30% of the default target, at least 6, scaled by the sensitivity', () => {
+  assert.equal(repDelta(exerciseById('rising')), 6);
+  assert.equal(repDelta(exerciseById('side_pressure')), 11);
+  assert.equal(repDelta(exerciseById('side_pressure'), 'high'), 7, 'high sensitivity counts smaller movements');
+  assert.equal(repDelta(exerciseById('side_pressure'), 'low'), 15);
+  assert.ok(exercises.every((e) => repDelta(e) >= 6));
+  assert.ok(repDelta(exerciseById('side_pressure')) < exerciseById('side_pressure').minRange / 2, 'much less than half the target');
+});
+
+test('very short cycles are noise, not repetitions', () => {
+  const t = new RepTracker(6, { minMs: 400 });
+  // two quick 200 ms wiggles of 20 degrees and then a real 2 s repetition
+  const samples = [[0, 150], [60, 130], [120, 150], [180, 130], [240, 150]];
+  for (let i = 0; i <= 30; i++) samples.push([300 + i * 66, 150 - 20 * Math.sin((Math.PI * i) / 30) * 1.0 + 20 * (i > 30 ? 1 : 0)]);
+  for (const [ms, a] of samples) t.add(ms, a);
+  assert.ok(t.reps.every((r) => r.e - r.s >= 400));
+});
+
+test('every repetition keeps a 24-point curve', () => {
+  const t = count(stream({ lo: 60, hi: 140 }), 20);
+  assert.ok(t.reps.length >= 4);
+  for (const r of t.reps) {
+    assert.equal(r.c.length, 24);
+    assert.ok(Math.abs(r.c[0] - r.mx) < 8 && Math.abs(Math.min(...r.c) - r.mn) < 8);
+  }
+  assert.equal(resample([[0, 1]], 5), null);
+  assert.deepEqual(resample([[0, 0], [100, 10]], 3), [0, 5, 10]);
+});
+
+test('AngleFilter removes single-frame spikes', () => {
+  const f = new AngleFilter(0.5);
+  const out = [100, 100, 100, 160, 100, 100].map((x) => f.push(x));
+  assert.ok(Math.max(...out) < 110, `spike leaked: ${out}`);
+  f.reset();
+  assert.equal(f.push(50), 50);
 });
 
 test('Smoother follows the signal and can be reset', () => {

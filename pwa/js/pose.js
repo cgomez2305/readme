@@ -1,5 +1,5 @@
 // On-device arm tracking with MediaPipe Pose Landmarker (runs in the browser, nothing is uploaded).
-import { jointAngle } from './analysis.js';
+import { jointAngle, AngleFilter } from './analysis.js';
 
 // MediaPipe landmark indices: shoulder, elbow, wrist, index finger.
 const IDX = {
@@ -7,38 +7,128 @@ const IDX = {
   right: { s: 12, e: 14, w: 16, i: 20 },
 };
 
-let landmarkerPromise;
+const MODELS = { lite: 'vendor/models/pose_landmarker_lite.task', full: 'vendor/models/pose_landmarker_full.task' };
+const promises = {};
 
-/** Loads the model once. Tries the GPU first and falls back to the CPU. */
-export function loadLandmarker(onStatus = () => {}) {
-  landmarkerPromise ??= (async () => {
+/** Creates a new landmarker (GPU first, CPU as fallback). The full model is slower but more accurate. */
+export async function createLandmarker(variant = 'lite') {
+  const { FilesetResolver, PoseLandmarker } = await import('../vendor/vision_bundle.mjs');
+  const fileset = await FilesetResolver.forVisionTasks('vendor/wasm');
+  const make = (delegate) =>
+    PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: MODELS[variant] ?? MODELS.lite, delegate },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+  let lm;
+  try {
+    lm = await make('GPU');
+    lm.delegate = 'GPU';
+  } catch {
+    lm = await make('CPU');
+    lm.delegate = 'CPU';
+  }
+  return lm;
+}
+
+/** Loads the model once per variant and keeps it. Used by the live camera. */
+export function loadLandmarker(onStatus = () => {}, variant = 'lite') {
+  promises[variant] ??= (async () => {
     onStatus('Cargando modelo...');
-    const { FilesetResolver, PoseLandmarker } = await import('../vendor/vision_bundle.mjs');
-    const fileset = await FilesetResolver.forVisionTasks('vendor/wasm');
-    const make = (delegate) =>
-      PoseLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: 'vendor/models/pose_landmarker_lite.task', delegate },
-        runningMode: 'VIDEO',
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-    let lm;
-    try {
-      lm = await make('GPU');
-      lm.delegate = 'GPU';
-    } catch {
-      lm = await make('CPU');
-      lm.delegate = 'CPU';
-    }
+    const lm = await createLandmarker(variant);
     onStatus('');
     return lm;
   })().catch((e) => {
-    landmarkerPromise = undefined;
+    promises[variant] = undefined;
     throw e;
   });
-  return landmarkerPromise;
+  return promises[variant];
+}
+
+/**
+ * Runs the arm detection over a video file on this phone, frame by frame, for the reference training.
+ * Nothing is uploaded and the video is not stored. Returns, for each arm, the filtered angle series
+ * [[ms, degrees]] and how much of the video the arm was seen.
+ * @param {File} file
+ * @param {{joint:'elbow'|'wrist', onProgress?:(p:number)=>void, shouldCancel?:()=>boolean}} o
+ */
+export async function analyzeVideoFile(file, { joint = 'elbow', onProgress = () => {}, shouldCancel = () => false } = {}) {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = url;
+  let lm = null;
+  try {
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = () => reject(new Error('No se pudo leer el vídeo. Prueba con un archivo MP4 o WebM.'));
+    });
+    const durationMs = video.duration * 1000;
+    if (!Number.isFinite(durationMs) || durationMs <= 0) throw new Error('No se pudo leer la duración del vídeo.');
+    if (video.duration > 240) throw new Error('El vídeo dura más de 4 minutos. Recorta el tramo con las repeticiones.');
+    const fake = globalThis.__FAKE_DETECT; // test hook: landmarks as a function of the video time
+    lm = fake ? null : await createLandmarker('full');
+    const state = {
+      left: { filter: new AngleFilter(0.5), series: [], seen: 0, lostAt: null },
+      right: { filter: new AngleFilter(0.5), series: [], seen: 0, lostAt: null },
+    };
+    let frames = 0, lastTs = 0;
+    const step = (tMs) => {
+      frames++;
+      let lmks;
+      if (fake) lmks = fake(tMs)?.landmarks?.[0];
+      else {
+        lastTs = Math.max(lastTs + 1, performance.now());
+        lmks = lm.detectForVideo(video, lastTs).landmarks?.[0];
+      }
+      for (const arm of ['left', 'right']) {
+        const st = state[arm];
+        const r = readArm(lmks, arm, video.videoWidth || 1, video.videoHeight || 1, joint);
+        const a = trackedAngle(r, joint);
+        if (a == null) {
+          if (st.lostAt == null) st.lostAt = tMs;
+          if (tMs - st.lostAt > 600) st.filter.reset();
+        } else {
+          st.lostAt = null;
+          st.seen++;
+          st.series.push([Math.round(tMs), Math.round(st.filter.push(a) * 10) / 10]);
+        }
+      }
+    };
+    video.playbackRate = fake ? 4 : video.duration > 90 ? 2 : 1; // the test hook needs no model time per frame
+    await video.play();
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      video.onended = finish;
+      const tick = (_now, meta) => {
+        if (done) return;
+        if (shouldCancel()) { video.pause(); return finish(); }
+        const t = (meta?.mediaTime ?? video.currentTime) * 1000;
+        step(t);
+        onProgress(Math.min(1, t / durationMs));
+        if (video.ended) return finish();
+        schedule();
+      };
+      const schedule = () => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(tick) : requestAnimationFrame(() => tick(0, null)));
+      schedule();
+    });
+    onProgress(1);
+    return {
+      durationMs, frames, cancelled: shouldCancel(),
+      series: { left: state.left.series, right: state.right.series },
+      cov: { left: frames ? state.left.seen / frames : 0, right: frames ? state.right.seen / frames : 0 },
+    };
+  } finally {
+    try { video.pause(); } catch { /* ignore */ }
+    URL.revokeObjectURL(url);
+    try { lm?.close(); } catch { /* ignore */ }
+  }
 }
 
 /**

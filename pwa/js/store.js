@@ -4,6 +4,9 @@
 const LS_SETS = 'fulcro.sets.v1';
 const LS_PLAN = 'fulcro.plan.v1';
 const LS_PREFS = 'fulcro.prefs.v1';
+const LS_REFS = 'fulcro.refs.v1';
+const LS_MODELS = 'fulcro.models.v1';
+const LS_REFS_REMOTE = 'fulcro.refs.remote.v1';
 
 function readJson(key, fallback) {
   try {
@@ -32,6 +35,21 @@ export const saveSets = (sets) => writeJson(LS_SETS, sets);
 export const loadPlan = () => ({ ...defaultPlan, ...readJson(LS_PLAN, {}) });
 export const savePlan = (plan) => writeJson(LS_PLAN, plan);
 export const loadPrefs = () => readJson(LS_PREFS, {});
+export const loadModels = () => {
+  const m = readJson(LS_MODELS, {});
+  return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+};
+export const saveModels = (m) => writeJson(LS_MODELS, m);
+export const loadRefs = () => {
+  const l = readJson(LS_REFS, []);
+  return Array.isArray(l) ? l : [];
+};
+export const saveRefs = (refs) => writeJson(LS_REFS, refs);
+export const loadRemoteRefs = () => {
+  const l = readJson(LS_REFS_REMOTE, []);
+  return Array.isArray(l) ? l : [];
+};
+export const saveRemoteRefs = (refs) => writeJson(LS_REFS_REMOTE, refs);
 export const savePrefs = (prefs) => writeJson(LS_PREFS, prefs);
 
 // ---- IndexedDB: videos and frames ----------------------------------------------------------

@@ -60,6 +60,7 @@ export const icons = {
   progress: '<path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6"/>',
   team: '<circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5M15 15c2.4-.2 4.6.8 5.5 3.5"/>',
   plan: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+  train: '<path d="M12 4l9 4.5-9 4.5-9-4.5z"/><path d="M7 11v4.5c0 1.4 2.2 2.8 5 2.8s5-1.4 5-2.8V11"/><path d="M21 8.5V14"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
 };
 export const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;

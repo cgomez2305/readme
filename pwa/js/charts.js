@@ -62,3 +62,46 @@ export function trendChart(points, { unit = '°', color = TEAL, height = 130 } =
   if (points.length > 1) out += `<text x="${W - padR}" y="${height - 4}" text-anchor="end">${formatDay(points.at(-1).date)}</text>`;
   return out + '</svg>';
 }
+
+/**
+ * Angle over time for both arms of an analysed video, with the repetitions of the chosen arm shaded.
+ * series: { left:[[ms,deg]], right:[[ms,deg]] }
+ */
+export function seriesChart(series, { durationMs, sel, reps = [], height = 130 } = {}) {
+  const all = [...series.left, ...series.right];
+  if (!all.length || !durationMs) return '<div class="muted small center" style="padding:24px 0">No se vio ningún brazo en el vídeo.</div>';
+  const W = 340, padL = 34, padR = 8, padT = 8, padB = 18;
+  const pw = W - padL - padR, ph = height - padT - padB;
+  let lo = Math.min(...all.map((p) => p[1])), hi = Math.max(...all.map((p) => p[1]));
+  if (hi - lo < 4) { lo -= 2; hi += 2; }
+  const x = (t) => padL + (t / durationMs) * pw, y = (v) => padT + ph - ((v - lo) / (hi - lo)) * ph;
+  const path = (pts) => {
+    const step = Math.max(1, Math.floor(pts.length / 220));
+    return pts.filter((_, i) => i % step === 0).map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
+  };
+  let out = `<svg class="chart" viewBox="0 0 ${W} ${height}" role="img" aria-label="Ángulo a lo largo del vídeo">`;
+  reps.forEach((r, i) => { out += `<rect x="${x(r.s).toFixed(1)}" y="${padT}" width="${Math.max(1, x(r.e) - x(r.s)).toFixed(1)}" height="${ph}" fill="${i % 2 ? '#3FE0C5' : '#FFB347'}" fill-opacity=".10"/>`; });
+  for (let i = 0; i <= 2; i++) {
+    const v = lo + ((hi - lo) * i) / 2;
+    out += `<line x1="${padL}" x2="${W - padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#fff" stroke-opacity=".08"/><text x="${padL - 6}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${Math.round(v)}°</text>`;
+  }
+  for (const arm of ['left', 'right']) {
+    if (!series[arm].length) continue;
+    out += `<path d="${path(series[arm])}" fill="none" stroke="${arm === 'right' ? '#FF8A4C' : '#3FE0C5'}" stroke-width="${arm === sel ? 2.5 : 1.2}" stroke-opacity="${arm === sel ? 1 : 0.45}" stroke-linejoin="round"/>`;
+  }
+  out += `<text x="${padL}" y="${height - 4}">0 s</text><text x="${W - padR}" y="${height - 4}" text-anchor="end">${Math.round(durationMs / 1000)} s</text>`;
+  return out + '</svg>';
+}
+
+/** Training loss over the epochs (and the held-out loss when there is one). Lower is better. */
+export function lossChart(curve, valCurve = [], { height = 80 } = {}) {
+  if (!curve?.length) return '';
+  const W = 340, pad = 6, ph = height - 2 * pad;
+  const all = [...curve, ...valCurve];
+  const hi = Math.max(...all), lo = Math.min(...all);
+  const span = hi - lo || 1;
+  const path = (arr) => arr.map((v, i) => `${i ? 'L' : 'M'}${(pad + (i / Math.max(1, arr.length - 1)) * (W - 2 * pad)).toFixed(1)} ${(pad + ph - ((v - lo) / span) * ph).toFixed(1)}`).join(' ');
+  return `<svg class="chart" viewBox="0 0 ${W} ${height}" role="img" aria-label="Error durante el entrenamiento">
+    <path d="${path(curve)}" fill="none" stroke="#FF8A4C" stroke-width="2"/>
+    ${valCurve.length ? `<path d="${path(valCurve)}" fill="none" stroke="#3FE0C5" stroke-width="2"/>` : ''}</svg>`;
+}

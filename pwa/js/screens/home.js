@@ -84,8 +84,8 @@ export function mount(root, api) {
           <div class="muted small" style="margin:4px 0 12px">${esc(exerciseById(last.ex).name)} · brazo ${armLabel(last.arm).toLowerCase()}</div>
           <div class="grid4">
             ${(isHold(exerciseById(last.ex))
-              ? [['Tiempo', `${Math.round(last.dur / 1000)} s`], ['Muñeca', last.sd == null ? '--' : `±${last.sd}°`], ['Peso', `${fmtKg(last.kg)} kg`], ['Brazo', armLabel(last.arm)]]
-              : [['Reps', last.reps.length], ['Rango', `${Math.round(setAvgRange(last))}°`], ['Tempo', `${(setAvgTempo(last) / 1000).toFixed(1)} s`], ['Fatiga', last.fat ? `Rep ${last.fat}` : 'No']])
+              ? [['Tiempo', `${Math.round(last.dur / 1000)} s`], ['Muñeca', last.sd == null ? '--' : `±${last.sd}°`], ['Puntos', last.sc ? last.sc.total : '--'], ['Peso', `${fmtKg(last.kg)} kg`]]
+              : [['Reps', last.reps.length], ['Rango', `${Math.round(setAvgRange(last))}°`], ['Puntos', last.sc ? last.sc.total : '--'], ['Fatiga', last.fat ? `Rep ${last.fat}` : 'No']])
               .map(([l, v]) => `<div><div class="muted tiny">${l}</div><div style="font-family:var(--display);font-weight:700;font-size:15px">${v}</div></div>`).join('')}
           </div>
         </div>

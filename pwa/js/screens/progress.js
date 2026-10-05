@@ -1,7 +1,7 @@
 import { state, subscribe } from '../state.js';
 import { exercises, exerciseById, painZoneLabel, armLabel, isHold } from '../exercises.js';
 import {
-  weekStart, dayOf, trainingDaysInWeek, rangeTrend, holdTrend, weightTrend, compareArms, painEvents, weekdayShort, formatDay,
+  weekStart, dayOf, trainingDaysInWeek, rangeTrend, holdTrend, scoreTrend, weightTrend, compareArms, painEvents, weekdayShort, formatDay,
   setAvgRange, fmtKg,
 } from '../analysis.js';
 import { esc, eyebrow, pill, chips, on } from '../ui.js';
@@ -18,6 +18,7 @@ export function mount(root, api) {
     const ex = exerciseById(exerciseId);
     const exSets = state.sets.filter((s) => s.ex === ex.id);
     const hold = isHold(ex);
+    const scores = scoreTrend(state.sets, ex.id);
     const unit = hold ? ' s' : '°';
     const trend = hold ? holdTrend(state.sets, ex.id) : rangeTrend(state.sets, ex.id);
     const weights = weightTrend(state.sets, ex.id);
@@ -55,6 +56,7 @@ export function mount(root, api) {
       ${exSets.length === 0
         ? `<div class="glass muted">Todavía no hay series de ${esc(ex.name.toLowerCase())}. Grábalas en Analizar.</div>`
         : `<div class="glass"><div class="bold" style="margin-bottom:10px">${hold ? 'Tiempo bajo tensión por día' : `Rango medio por día (${ex.joint === 'elbow' ? 'codo' : 'muñeca'})`}</div>${trendChart(trend, { unit })}</div>
+           ${scores.length > 1 ? `<div class="glass"><div class="bold" style="margin-bottom:10px">Puntuación de la ejecución por día</div>${trendChart(scores, { unit: '', color: '#FFC27A' })}</div>` : ''}
            ${weights.length > 1 && weights.some((w) => w.value > 0) ? `<div class="glass"><div class="bold" style="margin-bottom:10px">Peso máximo por día</div>${trendChart(weights, { unit: ' kg', color: '#FF8A4C' })}</div>` : ''}
            <div class="glass">
              <div class="bold">Brazo derecho vs. izquierdo</div><div class="muted small">Últimos 30 días</div>
@@ -77,6 +79,7 @@ export function mount(root, api) {
             <div class="muted tiny">${formatDay(new Date(s.at))} · brazo ${armLabel(s.arm).toLowerCase()} · ${fmtKg(s.kg)} kg</div></div>
           ${s.video ? '<span title="Con vídeo">🎞</span>' : ''}${s.pz ? '<span title="Con dolor">⚠</span>' : ''}
           <button class="icon-btn" data-delset="${esc(s.id)}" aria-label="Eliminar serie" style="width:34px;height:34px">🗑</button>
+          ${s.sc ? `<span class="pill ${s.sc.total >= 75 ? 'good' : s.sc.total >= 55 ? 'warn' : 'bad'}">${s.sc.total}</span>` : ''}
           <div class="bold small">${isHold(exerciseById(s.ex)) ? `${Math.round(s.dur / 1000)} s` : `${s.reps.length} reps · ${Math.round(setAvgRange(s))}°`}</div>
         </div>`).join('')}
     </div>`;

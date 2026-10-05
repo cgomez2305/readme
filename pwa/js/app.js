@@ -1,5 +1,5 @@
 // Shell: bottom tabs, overlay layer (report / replay), install prompt and service worker.
-import { subscribe, onSetSaved, onSetsDeleted } from './state.js';
+import { state, subscribe, onSetSaved, onSetsDeleted, onRefSaved, onRefDeleted, onModelSaved, onModelDeleted, setRemoteRefs, setTrainedModel } from './state.js';
 import * as cloud from './cloud.js';
 import { icon, on } from './ui.js';
 import * as home from './screens/home.js';
@@ -7,6 +7,7 @@ import * as analyze from './screens/analyze.js';
 import * as progress from './screens/progress.js';
 import * as team from './screens/team.js';
 import * as plan from './screens/plan.js';
+import * as train from './screens/train.js';
 import * as report from './screens/report.js';
 import * as replay from './screens/replay.js';
 
@@ -14,6 +15,7 @@ const TABS = [
   ['inicio', 'Inicio', 'home', home],
   ['analizar', 'Analizar', 'analyze', analyze],
   ['progreso', 'Progreso', 'progress', progress],
+  ['entrenar', 'Entrenar', 'train', train],
   ['equipo', 'Equipo', 'team', team],
   ['plan', 'Plan', 'plan', plan],
 ];
@@ -117,6 +119,24 @@ if (/iphone|ipad/i.test(navigator.userAgent) && !standalone) {
 // ---- start ------------------------------------------------------------------------------------
 onSetSaved((set) => cloud.pushSet(set));
 onSetsDeleted((ids) => cloud.deleteSets(ids));
+onRefSaved((ref) => cloud.pushRef(ref));
+onRefDeleted((id) => cloud.deleteRef(id));
+onModelSaved((m) => cloud.pushModel(m));
+onModelDeleted((ex) => cloud.deleteModel(ex));
+
+// After signing in: send what was saved before, then bring down the group's references and my trained models.
+let syncedFor = null;
+cloud.subscribeCloud(async () => {
+  if (!cloud.signedIn() || syncedFor === cloud.userId()) return;
+  syncedFor = cloud.userId();
+  await cloud.syncUp({ sets: state.sets, refs: state.refs, models: Object.values(state.models) });
+  const remote = await cloud.pullRefs();
+  if (remote) setRemoteRefs(remote.filter((r) => r.owner !== cloud.userId()));
+  for (const m of (await cloud.pullModels()) ?? []) {
+    const mine = state.models[m.ex];
+    if (!mine || new Date(m.at) > new Date(mine.at)) setTrainedModel(m, { fromCloud: true });
+  }
+});
 cloud.init();
 api.go(location.hash.replace('#/', '') || 'inicio');
 renderTabs();

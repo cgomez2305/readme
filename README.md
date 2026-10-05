@@ -21,6 +21,7 @@ Necesita la cámara (la app pide permiso la primera vez). Después de la primera
 - **Progreso:** semana, gráficas por ejercicio, comparación brazo derecho contra izquierdo, historial y dolor reportado.
 - **Descanso:** temporizador con sonido y vibración, y peso por serie.
 - **Plan:** planes semanales personalizados con y sin sparring, ciclo de 4 semanas con descarga, kg según tu 1RM, racha de semanas y exportación al calendario con aviso.
+- **Entrenar:** referencias a partir de vídeos y un modelo de IA de la técnica que se entrena en el navegador.
 - **Equipo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase (ver abajo).
 
 ## Ejercicios y guía básica
@@ -41,6 +42,31 @@ Frecuencia e intensidad son recomendaciones generales de un entrenador de armwre
 - **Intensidad:** trabajar con el **60% del 1RM**, y en side pressure con el **30-40%**. Defines tu 1RM por ejercicio en Analizar y la app te dice cuántos kg usar.
 - **Nunca ir al máximo ni al fallo:** la tendinitis aparece al fallo. La app avisa si usas más del 10% por encima de la guía, si pasas del 90% de tu 1RM y cuando detecta fatiga en la serie.
 - **Frecuencia:** Analizar avisa cuando ya llegaste al máximo semanal del ejercicio, y Plan avisa si le asignas demasiados días. Con el interruptor de sparring, side pressure baja a una vez por semana.
+
+## Puntuación de la ejecución
+Cada serie recibe una nota de 0 a 100 (Excelente desde 90, Buena desde 75, Mejorable desde 55) con cuatro partes:
+- **Rango:** cuánto se movió el ángulo frente al objetivo.
+- **Ritmo:** duración de cada repetición frente a la banda ideal.
+- **Constancia:** qué tan parecidas son las repeticiones entre sí.
+- **Técnica:** qué tan fluido es el movimiento y qué tanto se parece a la forma de las referencias. Si hay modelo entrenado, también cuenta lo que opina el modelo.
+
+La parte más floja pesa extra, así que un rango muy corto o un ritmo apresurado no se tapan con lo demás. El informe muestra la nota, el desglose, la nota de cada repetición y hasta dos consejos sobre lo que más resta. Mientras grabas ves la nota en vivo.
+
+## Precisión
+- **Sin exigir ángulos grandes.** Las repeticiones se cuentan por movimiento relativo (cada tramo mueve al menos el 30% del objetivo, mínimo 6°) y los objetivos por defecto son modestos. El objetivo real sale de tus referencias: tu propio rango, no un número fijo.
+- **Sensibilidad** (Baja, Media, Alta) en Analizar, para contar movimientos más pequeños.
+- **Detección Rápida o Precisa.** La precisa usa el modelo completo de MediaPipe: es más exacta pero más lenta y gasta más batería. Los vídeos que subes siempre se analizan con la precisa.
+- Filtro de mediana y suavizado del ángulo, y descarte de ciclos más rápidos que 0,4 s.
+- Límite de fondo: una cámara 2D mide la proyección del ángulo, no el ángulo real. Por eso conviene poner siempre el móvil en la misma posición y comparar contra tus propias referencias.
+
+## Entrenar: referencias y modelo de IA
+La pestaña **Entrenar** tiene dos partes:
+1. **Referencias.** Subes un vídeo de un deportista (o de un compañero o tuyo), eliges el ejercicio y el brazo, y la app lo analiza en tu móvil. Cuenta las repeticiones y guarda solo las curvas de ángulo, nunca el vídeo. También puedes marcar una serie tuya como referencia desde su informe. Con las referencias se calculan los perfiles: rango, ritmo y forma del movimiento.
+2. **Modelo de IA de la técnica.** Una red neuronal pequeña (unos mil pesos) que se entrena en tu navegador, sin servidor. Un autoencoder aprende cómo se ve una buena repetición con las referencias y las series que valoras con 👍. Si además valoras series con 👎, entrena un clasificador de buenas y malas. El modelo ocupa unos 6 KB por ejercicio y se guarda en tu móvil y en Supabase.
+
+Qué se entrena y qué no: el **detector de pose** (el que ve el cuerpo en la imagen) es el modelo de MediaPipe ya entrenado y no se entrena aquí. Lo que sí se entrena es el modelo que juzga la técnica a partir de las curvas de ángulo. Con poco material es orientativo: hacen falta al menos 12 repeticiones buenas por ejercicio, y a partir de unas 40 empieza a ser útil. Con más vídeos y más series valoradas mejora.
+
+Sobre los vídeos de profesionales: solo se guardan números de la técnica, pero el vídeo es de otra persona. Usa material propio o con permiso de quien aparece.
 
 ## Planes personalizados
 En **Plan** eliges si la semana tiene **sparring (domingo)** o no, los **días de gimnasio** (3 a 5 con sparring, 3 a 6 sin él) y la **semana del ciclo** (S1, S2, S3 y Descarga). La app arma la semana completa, la revisa contra la guía y, con tus 1RM, te dice los kg de cada serie. Con "Usar este plan" queda activo: **Inicio** muestra la sesión de hoy, **Analizar** muestra la prescripción y puedes exportarlo al calendario. Cada día se puede editar a mano y la app avisa si rompes alguna regla.
@@ -93,14 +119,15 @@ Si tienes menos días, el plan sigue cumpliendo las reglas pero avisa de lo que 
 ## Privacidad
 El análisis corre en tu móvil. El vídeo y los puntos del cuerpo no salen del dispositivo. La app bloquea cualquier conexión que no sea a su propio sitio o a tu proyecto de Supabase. Con un grupo conectado solo se suben los resúmenes de cada serie (ejercicio, peso, repeticiones, rango, tempo, dolor).
 
-## Grupo (Supabase)
+## Base de datos (Supabase)
+Supabase guarda las series con su puntuación y el detalle de cada repetición, las referencias y los modelos entrenados, y habilita el grupo. Sin Supabase todo funciona igual pero solo en el móvil.
 1. Crea un proyecto gratis en supabase.com.
-2. En **SQL Editor** pega y ejecuta `supabase/schema.sql`.
+2. En **SQL Editor** pega y ejecuta `supabase/schema.sql` entero. Se puede volver a ejecutar sin problema cuando haya cambios.
 3. En **Authentication > Providers > Email** desactiva "Confirm email" si no quieres que cada persona confirme su correo.
 4. En GitHub, en *Settings > Secrets and variables > Actions > Variables*, crea `SUPABASE_URL` (la URL del proyecto) y `SUPABASE_KEY` (la clave publicable).
 5. Lanza de nuevo el workflow **Deploy PWA** (pestaña Actions, Run workflow). La app se vuelve a publicar con el grupo activado.
 
-Las tablas tienen reglas de acceso: cada persona solo ve sus datos y los de su grupo.
+Tablas: `sets` (series con puntuación y detalle), `ref_sets` (referencias; las ve tu grupo), `ml_models` (modelos entrenados; solo los ves tú), `groups`, `group_members` y `profiles`. Todas tienen reglas de acceso: cada persona solo ve sus datos y, en las referencias, las de su grupo. Al iniciar sesión la app sube lo que ya tenías guardado en el móvil y baja las referencias del grupo y tus modelos.
 
 ## Publicación
 Cada cambio en `pwa/` ejecuta `.github/workflows/deploy-pwa.yml`: pasa las pruebas y publica la carpeta en la rama `gh-pages`. En el repo hay que tener activado *Settings > Pages > Deploy from a branch > gh-pages / root*.

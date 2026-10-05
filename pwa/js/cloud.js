@@ -16,6 +16,7 @@ export const subscribeCloud = (fn) => {
   return () => listeners.delete(fn);
 };
 export const signedIn = () => Boolean(session?.user);
+export const userId = () => session?.user?.id ?? null;
 export const displayName = () => session?.user?.user_metadata?.name || session?.user?.email || '';
 
 function loadScript(src) {
@@ -106,27 +107,86 @@ export const createGroup = (name) => rpcAction('create_group', { p_name: name.tr
 export const joinGroup = (code) => rpcAction('join_group', { p_code: code.trim().toUpperCase() });
 export const leaveGroup = () => rpcAction('leave_group', {});
 
-/** Uploads one set summary. Failures are silent: the set is already saved on the phone. */
+const setRow = (set) => ({
+  id: set.id,
+  user_id: session.user.id,
+  exercise: set.ex,
+  arm: set.arm,
+  weight_kg: set.kg,
+  started_at: new Date(set.at).toISOString(),
+  reps: set.reps.length,
+  avg_range: setAvgRange(set),
+  avg_tempo_ms: set.reps.length ? setAvgTempo(set) : set.dur, // hold sets: time under tension
+  fatigue_rep: set.fat ?? null,
+  pain_zone: set.pz ?? null,
+  pain_level: set.pl ?? 0,
+  score: set.sc?.total ?? null,
+  rate: set.rate ?? null, // the user's own rating: good / bad
+  cam: set.cam ?? null,
+  detail: { reps: set.reps, parts: set.sc?.parts ?? null, perRep: set.sc?.perRep ?? null }, // repetitions with their curves, for training
+});
+
+/** Uploads one set. Failures are silent: the set is already saved on the phone. */
 export async function pushSet(set) {
   if (!client || !signedIn()) return;
   try {
-    await client.from('sets').upsert({
-      id: set.id,
-      user_id: session.user.id,
-      exercise: set.ex,
-      arm: set.arm,
-      weight_kg: set.kg,
-      started_at: new Date(set.at).toISOString(),
-      reps: set.reps.length,
-      avg_range: setAvgRange(set),
-      avg_tempo_ms: set.reps.length ? setAvgTempo(set) : set.dur, // hold sets: time under tension
-      fatigue_rep: set.fat ?? null,
-      pain_zone: set.pz ?? null,
-      pain_level: set.pl ?? 0,
-    });
+    await client.from('sets').upsert(setRow(set));
   } catch (e) {
     console.warn('Fulcro: no se pudo subir la serie', e);
   }
+}
+
+// ---- references and trained models ("the training") ------------------------------------------------
+const refRow = (ref) => ({
+  id: ref.id, user_id: session.user.id, exercise: ref.ex, arm: ref.arm, source: ref.source, label: ref.label ?? '',
+  created_at: ref.at, cov: ref.cov ?? null, dur_ms: ref.durMs ?? null, reps: ref.reps, shared: true,
+});
+export async function pushRef(ref) {
+  if (!client || !signedIn()) return;
+  try { await client.from('ref_sets').upsert(refRow(ref)); } catch (e) { console.warn('Fulcro: no se pudo subir la referencia', e); }
+}
+export async function deleteRef(id) {
+  if (!client || !signedIn()) return;
+  try { await client.from('ref_sets').delete().eq('id', id); } catch (e) { console.warn('Fulcro: no se pudo borrar la referencia', e); }
+}
+/** References visible to me: mine and the ones my group shared. Null when offline. */
+export async function pullRefs() {
+  if (!client || !signedIn()) return null;
+  try {
+    const { data, error } = await client.from('ref_sets').select('*').order('created_at', { ascending: false }).limit(300);
+    if (error) throw error;
+    return data.map((r) => ({
+      id: r.id, ex: r.exercise, arm: r.arm, source: r.source, label: r.label, at: r.created_at, cov: r.cov, durMs: r.dur_ms, reps: r.reps, owner: r.user_id,
+    }));
+  } catch (e) { console.warn('Fulcro: no se pudieron leer las referencias', e); return null; }
+}
+const modelRow = (m) => ({ user_id: session.user.id, exercise: m.ex, trained_at: m.at, n_pos: m.nPos, n_neg: m.nNeg, model: m });
+export async function pushModel(m) {
+  if (!client || !signedIn()) return;
+  try { await client.from('ml_models').upsert(modelRow(m)); } catch (e) { console.warn('Fulcro: no se pudo subir el modelo', e); }
+}
+export async function deleteModel(exId) {
+  if (!client || !signedIn()) return;
+  try { await client.from('ml_models').delete().eq('exercise', exId).eq('user_id', session.user.id); } catch (e) { console.warn('Fulcro: no se pudo borrar el modelo', e); }
+}
+/** My own trained models. Null when offline. */
+export async function pullModels() {
+  if (!client || !signedIn()) return null;
+  try {
+    const { data, error } = await client.from('ml_models').select('model').eq('user_id', session.user.id);
+    if (error) throw error;
+    return data.map((r) => r.model);
+  } catch (e) { console.warn('Fulcro: no se pudieron leer los modelos', e); return null; }
+}
+
+/** Sends everything saved on this phone (used right after signing in). Upserts, so repeating it is harmless. */
+export async function syncUp({ sets = [], refs = [], models = [] }) {
+  if (!client || !signedIn()) return;
+  try {
+    for (let i = 0; i < sets.length; i += 50) await client.from('sets').upsert(sets.slice(i, i + 50).map(setRow));
+    if (refs.length) await client.from('ref_sets').upsert(refs.map(refRow));
+    if (models.length) await client.from('ml_models').upsert(models.map(modelRow));
+  } catch (e) { console.warn('Fulcro: no se pudo sincronizar', e); }
 }
 
 /** Removes set summaries from the group's copy. Failures are silent: the local delete already happened. */

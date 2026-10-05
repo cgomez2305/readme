@@ -182,3 +182,59 @@ grant execute on function public.join_group(text) to authenticated;
 grant execute on function public.leave_group() to authenticated;
 grant execute on function public.group_activity() to authenticated;
 grant execute on function public.group_exercise_stats(text) to authenticated;
+
+-- =====================================================================================================
+-- Entrenamiento: puntuación, valoraciones, referencias y modelos entrenados (v2)
+-- Se puede ejecutar encima de la versión anterior: todo es idempotente.
+-- =====================================================================================================
+
+-- Más datos por serie: puntuación (0-100), valoración del usuario (good / bad), cámara y el detalle de
+-- las repeticiones con su curva de ángulo, para poder entrenar con ellos.
+alter table public.sets add column if not exists score real;
+alter table public.sets add column if not exists rate text;
+alter table public.sets add column if not exists cam text;
+alter table public.sets add column if not exists detail jsonb;
+
+-- Referencias: curvas de ángulo de repeticiones de un deportista, de un compañero o propias.
+-- Nunca se guarda el vídeo: solo los números de la técnica.
+create table if not exists public.ref_sets (
+  id text primary key,
+  user_id uuid not null references auth.users on delete cascade,
+  exercise text not null,
+  arm text not null,
+  source text not null check (source in ('pro', 'mate', 'own')),
+  label text not null default '',
+  created_at timestamptz not null default now(),
+  cov real,
+  dur_ms int,
+  reps jsonb not null,
+  shared boolean not null default true
+);
+create index if not exists ref_sets_user on public.ref_sets (user_id, exercise);
+
+-- Modelos entrenados en el navegador (pesos de una red pequeña), uno por persona y ejercicio.
+create table if not exists public.ml_models (
+  user_id uuid not null references auth.users on delete cascade,
+  exercise text not null,
+  trained_at timestamptz not null default now(),
+  n_pos int not null default 0,
+  n_neg int not null default 0,
+  model jsonb not null,
+  primary key (user_id, exercise)
+);
+
+alter table public.ref_sets enable row level security;
+alter table public.ml_models enable row level security;
+
+-- Referencias: las mías y las que comparte mi grupo.
+drop policy if exists ref_sets_read on public.ref_sets;
+create policy ref_sets_read on public.ref_sets for select to authenticated
+  using (user_id = auth.uid() or (shared and public.shares_group(user_id)));
+drop policy if exists ref_sets_write on public.ref_sets;
+create policy ref_sets_write on public.ref_sets for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Modelos: solo los míos.
+drop policy if exists ml_models_all on public.ml_models;
+create policy ml_models_all on public.ml_models for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());

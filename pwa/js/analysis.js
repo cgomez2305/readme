@@ -23,6 +23,26 @@ export function jointAngle(a, b, c) {
 }
 
 export const repRange = (r) => r.mx - r.mn;
+
+/** Number of points of a repetition's angle curve. */
+export const CURVE_N = 24;
+
+/** Resamples [t, value] points (sorted by t) to n evenly spaced values, rounded to 0.1. Null with fewer than 2 points. */
+export function resample(points, n = CURVE_N) {
+  if (points.length < 2) return null;
+  const t0 = points[0][0], t1 = points.at(-1)[0];
+  if (t1 <= t0) return null;
+  const out = [];
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const t = t0 + ((t1 - t0) * i) / (n - 1);
+    while (j < points.length - 2 && points[j + 1][0] < t) j++;
+    const [ta, va] = points[j], [tb, vb] = points[j + 1];
+    const f = tb === ta ? 0 : Math.min(1, Math.max(0, (t - ta) / (tb - ta)));
+    out.push(Math.round((va + (vb - va) * f) * 10) / 10);
+  }
+  return out;
+}
 export const repDuration = (r) => r.e - r.s;
 export const setAvgRange = (s) => mean(s.reps.map(repRange));
 export const setAvgTempo = (s) => mean(s.reps.map(repDuration));
@@ -34,8 +54,10 @@ export const setAvgTempo = (s) => mean(s.reps.map(repDuration));
  * The range of a repetition is the valley against the higher of its two peaks.
  */
 export class RepTracker {
-  constructor(delta = 10) {
+  constructor(delta = 10, { minMs = 400, maxMs = 25000 } = {}) {
     this.delta = delta;
+    this.minMs = minMs;
+    this.maxMs = maxMs;
     this.reset();
   }
   reset() {
@@ -44,9 +66,11 @@ export class RepTracker {
     this.hi = null; this.lo = null; // running extremes {v, t}
     this.prevPeak = null; this.valley = null;
     this.samples = []; // wrist samples since the last peak: [t, wrist]
+    this.buf = []; // angle samples since the last peak: [t, angle], used for the curve of each repetition
   }
   add(tMs, angle, wrist) {
     if (wrist != null) this.samples.push([tMs, wrist]);
+    this.buf.push([tMs, angle]);
     const d = this.delta;
     const pt = { v: angle, t: tMs };
     if (this.mode === 'init') {
@@ -54,6 +78,7 @@ export class RepTracker {
       if (!this.lo || angle < this.lo.v) this.lo = pt;
       if (this.hi.v - angle >= d && this.hi.t <= this.lo.t) { // fell from a peak
         this.mode = 'down'; this.prevPeak = this.hi; this.lo = pt; this.samples = this.samples.filter((x) => x[0] >= this.hi.t);
+        this.buf = this.buf.filter((x) => x[0] >= this.hi.t);
       } else if (angle - this.lo.v >= d && this.lo.t <= this.hi.t) { // rose from a valley
         this.mode = 'up'; this.valley = this.lo; this.hi = pt;
       }
@@ -69,16 +94,37 @@ export class RepTracker {
     if (this.hi.v - angle >= d) {
       if (this.prevPeak && this.valley) {
         const s = this.prevPeak.t, e = this.hi.t;
-        const rep = { s, e, mn: this.valley.v, mx: Math.max(this.prevPeak.v, this.hi.v) };
-        const w = this.samples.filter((x) => x[0] >= s && x[0] <= e).map((x) => x[1]);
-        if (w.length) rep.w = mean(w);
-        this.reps.push(rep);
+        if (e - s >= this.minMs && e - s <= this.maxMs) { // faster or slower than any real repetition: noise
+          const rep = { s, e, mn: this.valley.v, mx: Math.max(this.prevPeak.v, this.hi.v) };
+          const w = this.samples.filter((x) => x[0] >= s && x[0] <= e).map((x) => x[1]);
+          if (w.length) rep.w = mean(w);
+          const c = resample(this.buf.filter((x) => x[0] >= s && x[0] <= e));
+          if (c) rep.c = c;
+          this.reps.push(rep);
+        }
       }
       this.prevPeak = this.hi;
       this.samples = this.samples.filter((x) => x[0] >= this.hi.t);
+      this.buf = this.buf.filter((x) => x[0] >= this.hi.t);
       this.mode = 'down';
       this.lo = pt;
     }
+  }
+}
+
+/**
+ * Cleans an angle stream: median of the last three samples (kills single-frame spikes) and then exponential
+ * smoothing. Call reset() when the arm was lost.
+ */
+export class AngleFilter {
+  constructor(alpha = 0.5) { this.alpha = alpha; this.reset(); }
+  reset() { this.last = []; this.v = null; }
+  push(x) {
+    this.last.push(x);
+    if (this.last.length > 3) this.last.shift();
+    const med = [...this.last].sort((a, b) => a - b)[this.last.length >> 1];
+    this.v = this.v == null ? med : this.v + this.alpha * (med - this.v);
+    return this.v;
   }
 }
 
@@ -103,7 +149,9 @@ export function detectFatigue(reps) {
 
 const sec = (ms, d = 1) => (ms / 1000).toFixed(d);
 
-export function summarize(reps, ex) {
+/** targets (optional): { range, tempoLo, tempoHi, rangeSrc } from references; the exercise defaults are used otherwise. */
+export function summarize(reps, ex, targets = null) {
+  const T = { range: targets?.range ?? ex.minRange, tempoLo: targets?.tempoLo ?? ex.tempoMinMs, tempoHi: targets?.tempoHi ?? ex.tempoMaxMs };
   const ranges = reps.map(repRange);
   const avgRange = mean(ranges);
   const tempo = mean(reps.map(repDuration));
@@ -114,22 +162,23 @@ export function summarize(reps, ex) {
     tips.push({ level: 'info', title: 'Pocas repeticiones',
       text: 'Con menos de 3 repeticiones válidas no se puede analizar la serie. Revisa la posición de la cámara.' });
   } else {
-    if (avgRange < ex.minRange) {
+    const src = targets?.rangeSrc ? ` (${targets.rangeSrc})` : '';
+    if (avgRange < T.range) {
       tips.push({ level: 'warn', title: 'Rango corto',
-        text: `Tu rango medio fue ${Math.round(avgRange)}° y el objetivo es ${Math.round(ex.minRange)}° o más. Baja el peso y completa el movimiento.` });
+        text: `Tu rango medio fue ${Math.round(avgRange)}° y el objetivo es ${Math.round(T.range)}° o más${src}. Baja el peso y completa el movimiento.` });
     } else {
       tips.push({ level: 'good', title: 'Rango completo',
-        text: `Rango medio de ${Math.round(avgRange)}°, por encima del objetivo de ${Math.round(ex.minRange)}°.` });
+        text: `Rango medio de ${Math.round(avgRange)}°, por encima del objetivo de ${Math.round(T.range)}°${src}.` });
     }
-    if (tempo < ex.tempoMinMs) {
+    if (tempo < T.tempoLo) {
       tips.push({ level: 'warn', title: 'Demasiado rápido',
-        text: `Cada repetición duró ${sec(tempo)} s. Apunta a ${sec(ex.tempoMinMs)} s o más y controla la bajada.` });
-    } else if (tempo > ex.tempoMaxMs) {
+        text: `Cada repetición duró ${sec(tempo)} s. Apunta a ${sec(T.tempoLo)} s o más y controla la bajada.` });
+    } else if (tempo > T.tempoHi) {
       tips.push({ level: 'info', title: 'Tempo lento',
         text: `Cada repetición duró ${sec(tempo)} s. Está bien para trabajo isométrico; si no era la idea, acelera un poco.` });
     } else {
       tips.push({ level: 'good', title: 'Tempo controlado',
-        text: `${sec(tempo)} s por repetición, dentro del rango de ${sec(ex.tempoMinMs)} a ${sec(ex.tempoMaxMs)} s.` });
+        text: `${sec(tempo)} s por repetición, dentro del rango de ${sec(T.tempoLo)} a ${sec(T.tempoHi)} s.` });
     }
     if (variation > 0.15) {
       tips.push({ level: 'warn', title: 'Rango irregular',
@@ -235,6 +284,10 @@ export const monthShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago
 export const formatDay = (d) => `${d.getDate()} ${monthShort[d.getMonth()]}`;
 export const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 export const fmtKg = (kg) => `${Number.isInteger(kg) ? kg : kg}`;
+
+/** Average score (0-100) per training day for one exercise. */
+export const scoreTrend = (sets, exId) =>
+  perDay(sets.filter((s) => s.ex === exId), (s) => s.sc?.total ?? null).map((d) => ({ date: d.date, value: mean(d.vals) }));
 
 /** Average time under tension per training day for a hold exercise, in seconds. */
 export const holdTrend = (sets, exId) =>

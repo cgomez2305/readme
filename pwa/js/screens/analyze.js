@@ -4,14 +4,15 @@
 // The selfie camera is the default; the front or back camera, or a specific lens, can be chosen.
 import {
   state, subscribe, subscribeRest, currentExercise, pickExercise, pickArm, setKg, setRestSeconds, setsToday, startRest, addRest, cancelRest,
-  setCam, setDeviceId, setOneRm, plannedItemFor, hasPlan, todaySession,
+  setCam, setDeviceId, setOneRm, plannedItemFor, hasPlan, todaySession, setSens, setDetector, targetsFor,
 } from '../state.js';
+import { scoreSet, scoreHold } from '../score.js';
 import { openDeleteSet, setLine } from './manage.js';
 import { prescriptionText, pctText, itemKg } from '../plans.js';
 import {
-  exercises, exerciseById, jointLabel, isHold, freqText, freqMax, intensityText, recommendedKg, intensityStatus, repDelta,
+  exercises, exerciseById, jointLabel, isHold, freqText, freqMax, intensityText, recommendedKg, intensityStatus, repDelta, sensitivityLabel,
 } from '../exercises.js';
-import { RepTracker, Smoother, detectFatigue, stdDev, weeklyDaysFor } from '../analysis.js';
+import { RepTracker, AngleFilter, detectFatigue, stdDev, weeklyDaysFor } from '../analysis.js';
 import { loadLandmarker, readArm, drawArm, trackedAngle } from '../pose.js';
 import { esc, eyebrow, pill, metric, seg, on, toast } from '../ui.js';
 
@@ -78,7 +79,9 @@ export function mount(root, api) {
   let recording = false, tracker = null, frames = [], recorder = null, chunks = [], t0 = 0, startedAt = new Date();
   let reading = null, brightness = 128, lastRepMs = 0, elapsedMs = 0;
   // Detection quality while recording, so a failed set can be explained.
-  const smoother = new Smoother(0.5);
+  const smoother = new AngleFilter(0.5);
+  let liveT = null; // scoring targets of the exercise being recorded
+  let liveScore = null;
   let recFrames = 0, recSeen = 0, obsMin = Infinity, obsMax = -Infinity, lostSince = 0, otherSeen = 0;
 
   const ex = () => currentExercise();
@@ -122,7 +125,10 @@ export function mount(root, api) {
         <span class="muted">Guía: ${intensityText(e)}</span>${rec ? ` <b>= ${kgText(rec.low)}${rec.high !== rec.low ? `-${kgText(rec.high)}` : ''} kg</b> <span class="muted">(1RM ${kgText(oneRm)} kg)</span>` : ''}
         ${st === 'max' ? `<div style="color:var(--danger);margin-top:2px">Cerca de tu máximo: no entrenes al máximo.</div>` : st === 'high' ? `<div style="color:var(--warn);margin-top:2px">Por encima de la guía.</div>` : ''}</div>
         <button class="btn ghost small" id="a-1rm">${rec ? 'Cambiar 1RM' : 'Definir 1RM'}</button></div>
-      <div class="row"><span class="muted small">Descanso</span><div class="grow">${seg('rest', [[60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min']], state.restSeconds)}</div></div>`;
+      <div class="row"><span class="muted small">Descanso</span><div class="grow">${seg('rest', [[60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min']], state.restSeconds)}</div></div>
+      <div class="row"><span class="muted small" style="width:78px">Sensibilidad</span><div class="grow">${seg('sens', Object.entries(sensitivityLabel), state.sens)}</div></div>
+      <div class="row"><span class="muted small" style="width:78px">Detección</span><div class="grow">${seg('det', [['lite', 'Rápida'], ['full', 'Precisa']], state.detector)}</div></div>
+      <div class="muted tiny">Si no cuenta repeticiones, sube la sensibilidad. La detección precisa es más lenta y usa más batería.</div>`;
   }
   /** The newest set saved today, with a quick way to delete a recording that did not turn out well. */
   function renderLast() {
@@ -148,7 +154,8 @@ export function mount(root, api) {
     $('#a-live').innerHTML = metric(jointLabel(e), tracked == null ? '--' : `${Math.round(tracked)}°`)
       + (isHold(e)
         ? metric('Tiempo', recording ? `${(elapsedMs / 1000).toFixed(0)} s` : '--') + metric('Peso', `${state.kg} kg`)
-        : metric('Repeticiones', String(tracker?.reps.length ?? 0)) + metric('Rango visto', recording && swing ? `${swing}°` : '--'));
+        : metric('Repeticiones', String(tracker?.reps.length ?? 0)) + (recording && liveScore != null
+          ? metric('Puntuación', `${liveScore}`) : metric('Rango visto', recording && swing ? `${swing}°` : '--')));
     const lightOk = brightness >= 55, armOk = Boolean(reading?.inFrame);
     const lost = recording && !reading && performance.now() - lostSince > 1200;
     $('#a-status').innerHTML = pill(lightOk ? 'Luz buena' : 'Luz baja', lightOk ? 'good' : 'warn')
@@ -243,7 +250,7 @@ export function mount(root, api) {
 
   async function loadModel() {
     try {
-      landmarker = await loadLandmarker();
+      landmarker = await loadLandmarker(() => {}, state.detector);
       modelError = null;
     } catch (e) {
       console.warn(e);
@@ -283,9 +290,11 @@ export function mount(root, api) {
         obsMin = Math.min(obsMin, tracked);
         obsMax = Math.max(obsMax, tracked);
         if (tracker) {
+          const before = tracker.reps.length;
           tracker.add(t, tracked, reading.wristAngle);
           const last = tracker.reps.at(-1);
           if (last) lastRepMs = last.e - last.s;
+          if (tracker.reps.length > before && liveT) liveScore = scoreSet(tracker.reps, liveT)?.total ?? null;
         }
         frames.push({ t: Math.round(t), p: reading.p.map((v) => Math.round(v * 1e4) / 1e4), a: Math.round(tracked * 10) / 10 });
       }
@@ -304,7 +313,9 @@ export function mount(root, api) {
   // ---- recording ------------------------------------------------------------------------------
   function start() {
     const e = ex();
-    tracker = isHold(e) ? null : new RepTracker(repDelta(e));
+    tracker = isHold(e) ? null : new RepTracker(repDelta(e, state.sens));
+    liveT = targetsFor(e.id);
+    liveScore = null;
     frames = []; chunks = []; lastRepMs = 0; elapsedMs = 0;
     recFrames = 0; recSeen = 0; obsMin = Infinity; obsMax = -Infinity; lostSince = 0;
     startedAt = new Date();
@@ -345,6 +356,7 @@ export function mount(root, api) {
     set.cov = recFrames ? Math.round((recSeen / recFrames) * 100) / 100 : 0;
     if (recSeen) set.obs = [Math.round(obsMin), Math.round(obsMax)];
     if (isHold(e) && frames.length >= 10) set.sd = Math.round(stdDev(frames.map((f) => f.a)) * 10) / 10;
+    set.sc = isHold(e) ? scoreHold(set.sd) : scoreSet(reps, targetsFor(e.id)); // score of the execution, null without data
     renderChrome();
     api.openReport({ set, isNew: true, frames, blob, onSaved: () => startRest() });
   }
@@ -406,16 +418,23 @@ export function mount(root, api) {
     '[data-lastdel]': (el) => openDeleteSet(el.dataset.lastdel),
     '#a-flip': () => { if (!recording) setCam(mirrored ? 'environment' : 'user'); },
     '[data-seg="rest"]': (el) => setRestSeconds(Number(el.dataset.v)),
+    '[data-seg="sens"]': (el) => setSens(el.dataset.v),
+    '[data-seg="det"]': (el) => setDetector(el.dataset.v),
     '[data-kg]': (el) => setKg(state.kg + Number(el.dataset.kg)),
     '[data-rest]': (el) => (el.dataset.rest === 'skip' ? cancelRest() : addRest(30)),
   });
   const onChange = (ev) => { if (ev.target.id === 'a-device') setDeviceId(ev.target.value); };
   root.addEventListener('change', onChange);
-  let lastExercise = state.exerciseId;
+  let lastExercise = state.exerciseId, lastDetector = state.detector;
   const offState = subscribe(() => {
     if (!alive) return;
     const key = `${state.cam}|${state.deviceId}`;
     if (key !== lastCamKey && !recording) { lastCamKey = key; openCamera(); return; }
+    if (state.detector !== lastDetector && !recording) { // another detection model: load it
+      lastDetector = state.detector;
+      landmarker = null;
+      loadModel();
+    }
     if (state.exerciseId !== lastExercise) {
       lastExercise = state.exerciseId;
       if (!recording) { tracker = null; lastRepMs = 0; elapsedMs = 0; }
