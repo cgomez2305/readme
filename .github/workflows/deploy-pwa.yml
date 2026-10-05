@@ -1,3 +1,4 @@
+# Publishes the PWA to the gh-pages branch. SUPABASE_URL and SUPABASE_KEY (repository variables) are written into config.js.
 name: Deploy PWA
 
 on:
