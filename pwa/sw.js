@@ -6,7 +6,7 @@ const CORE = [
   './', 'index.html', 'config.js', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/state.js', 'js/store.js', 'js/ui.js', 'js/charts.js', 'js/analysis.js', 'js/exercises.js', 'js/pose.js', 'js/cloud.js', 'js/plans.js',
   'js/screens/home.js', 'js/screens/analyze.js', 'js/screens/progress.js', 'js/screens/team.js', 'js/screens/plan.js',
-  'js/screens/report.js', 'js/screens/replay.js',
+  'js/screens/report.js', 'js/screens/replay.js', 'js/screens/manage.js',
 ];
 // Cached up front so the first offline visit looks right; the model and wasm are cached when first used.
 const HEAVY_CORE = ['fonts/Figtree.ttf', 'fonts/Unbounded.ttf', 'icons/icon.svg', 'icons/icon-192.png'];
