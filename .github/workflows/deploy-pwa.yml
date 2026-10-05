@@ -1,0 +1,42 @@
+name: Deploy PWA
+
+on:
+  push:
+    branches: [main, ccr-026c5225-95fiv3]
+    paths: ['pwa/**', '.github/workflows/deploy-pwa.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-pwa
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node --test pwa/tests/*.test.mjs
+      - name: Write config and cache version
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+        run: |
+          printf "window.FULCRO_CONFIG = { supabaseUrl: '%s', supabaseKey: '%s' };\n" "$SUPABASE_URL" "$SUPABASE_KEY" > pwa/config.js
+          sed -i "s/__VERSION__/${GITHUB_SHA::7}/" pwa/sw.js
+      - name: Publish to the gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: pwa
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: 'Deploy ${{ github.sha }}'

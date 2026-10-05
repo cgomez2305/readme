@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta name="theme-color" content="#0E1118">
+  <meta name="description" content="Fulcro analiza tus ejercicios de armwrestling con la cámara del móvil.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fulcro">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Fulcro</title>
+  <link rel="preload" href="fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"><i class="b1"></i><i class="b2"></i></div>
+  <div id="install" class="install" hidden></div>
+  <main id="view" aria-live="polite"></main>
+  <div id="overlay" class="overlay" hidden></div>
+  <nav id="tabs" class="tabs" aria-label="Navegación"></nav>
+  <noscript><p style="padding:24px">Fulcro necesita JavaScript para funcionar.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

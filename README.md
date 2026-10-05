@@ -1,115 +1,69 @@
 # Fulcro — Entrenador de armwrestling con IA
 
-App nativa para móvil que analiza en vídeo tus ejercicios y técnica de armwrestling y te da feedback comparándote con competidores profesionales.
+App web instalable (PWA) que analiza tus ejercicios de armwrestling con la cámara del móvil: mide el ángulo del codo o de la muñeca, cuenta repeticiones, detecta cuándo aparece la fatiga y guarda tu progreso.
 
-> Estado: concepto / definición de MVP. Sin código todavía.
+**Abrir la app:** https://cgomez2305.github.io/readme/
 
-## ¿Es posible?
-Sí, pero por fases. Lo que sí es viable hoy y lo que no:
+## Instalar en el móvil
+- **Android (Chrome, Brave, Edge):** abre el enlace, toca el menú ⋮ y elige **Instalar app** o **Añadir a pantalla de inicio**.
+- **iPhone (Safari):** toca Compartir y luego **Añadir a pantalla de inicio**.
 
-| Capacidad | Viabilidad | Cómo |
-|---|---|---|
-| Detectar postura y ángulos (muñeca, codo, hombro, tronco) | Alta | Estimación de pose en el propio móvil (MediaPipe Pose / MoveNet) |
-| Contar repeticiones, tempo, rango de movimiento | Alta | Reglas sobre los ángulos de la pose |
-| Comparar tu ejecución con una "referencia" | Media | Alinear secuencias (DTW) entre tu pose y la de un pro |
-| Reconocer técnica (hook, top roll, press, king's move) | Media | Clasificador entrenado con vídeos etiquetados |
-| Analizar un combate (posición inicial, ventaja, momento de pérdida) | Media-baja | Requiere dos personas, mano y mesa visibles, y datos etiquetados |
-| Medir fuerza de muñeca/dedos desde el vídeo | Baja | La cámara no ve fuerza; necesita sensores o dinamómetro externo |
+Necesita la cámara (la app pide permiso la primera vez). Después de la primera visita funciona sin conexión, incluido el análisis.
 
-**Punto clave:** no hace falta "entrenar un modelo gigante con vídeos de pros" para empezar. La pose se extrae con modelos ya entrenados; los vídeos de pros sirven para construir *referencias* y, más adelante, un clasificador propio.
-
-## Aviso sobre los vídeos de competidores
-Los vídeos de YouTube/Instagram tienen derechos de autor. Para un uso personal de análisis es una zona gris. Para publicar la app o entrenar un modelo comercial necesitas permiso. Opciones: acuerdos con atletas, grabar a compañeros de tu equipo, o guardar solo las poses extraídas (esqueletos), no el vídeo.
-
-## MVP (v0.1)
-1. Grabar o subir un vídeo de un ejercicio (curl con polea, pronación, press lateral, rising…).
-2. Extraer pose y mostrar el esqueleto superpuesto.
-3. Métricas por repetición: ángulo de codo y muñeca, rango, tempo, simetría.
-4. Historial y gráficas de progreso por ejercicio.
-5. Consejos basados en reglas ("el codo se despega del pad", "bajas demasiado rápido").
-
-## Roadmap
-- **v0.2** Biblioteca de referencias de pros (esqueletos) y comparación lado a lado.
-- **v0.3** Clasificación de técnica (hook / top roll / press) con modelo propio.
-- **v0.4** Análisis de combate: detectar posición inicial, ventaja y momento de pérdida.
-- **v0.5** Plan de entrenamiento adaptativo según debilidades detectadas.
-- **Futuro** Sensores externos (dinamómetro BLE) para correlacionar fuerza y técnica.
-
-## Stack elegido
-- **App:** Flutter (Dart). Un solo código para Android e iOS, genera el APK directamente y tiene buen rendimiento con cámara y gráficos propios.
-- **Pose en el dispositivo:** ML Kit Pose Detection (`google_mlkit_pose_detection`), 33 puntos del cuerpo sin servidor ni coste por uso.
-- **Backend:** Supabase (Postgres, autenticación, almacenamiento). Código abierto y exportable, sin dependencia de un solo proveedor.
-- **ML propio (más adelante):** Python + PyTorch, offline. El modelo entrenado se exporta a TFLite y se ejecuta en el móvil.
-- **Suscripciones (fase Pro):** RevenueCat sobre Google Play Billing y App Store.
-- **CI/CD:** GitHub Actions para compilar APK/AAB en cada versión.
-
-## Distribución
-1. **Ahora:** APK firmado, instalado directamente en los móviles del grupo (`flutter build apk --release`).
-2. **Después:** Google Play con pruebas cerradas, usando AAB.
-3. **Con suscripción:** Play Store y App Store con RevenueCat.
-
-## Diseño
-Interfaz oscura, tipografía fuerte y esqueleto en neón sobre el vídeo; prototipo en Figma antes de programar.
-
-## Siguientes pasos
-- [ ] Decidir Flutter vs React Native
-- [ ] Elegir 3 ejercicios para el MVP
-- [ ] Grabar un dataset propio de ~50 vídeos
-- [ ] Prototipo de extracción de pose y cálculo de ángulos
-- [ ] Prototipo de UI en Figma
-
-## Identidad (v0)
-- **Nombre:** Fulcro, el punto de apoyo de la palanca; en armwrestling, el codo sobre el pad.
-- **Logo:** `design/logo.svg` (pivote, antebrazo y arco del ángulo medido).
-- **Prototipo de interfaz:** `design/prototype.html` (abrir en el navegador). Oscuro, glassmorphism, 4 pantallas: Inicio, Analizar, Equipo, Técnicas.
-- **Paleta:** cobre `#FF8A4C` (acción), turquesa `#3FE0C5` (ángulo bueno), ámbar `#FFB347` (atención), grafito `#0E1118`.
-- **Tipografías:** Unbounded (títulos) y Figtree (texto).
-- **Modelo de negocio:** primero gratis para el grupo de entrenamiento; después plan Pro por suscripción.
-
-## Desarrollo
-Proyecto Flutter (solo Android por ahora). Código en `lib/`:
-- `theme/` colores y tipografías · `widgets/` vidrio, botones, logo · `screens/` Inicio, Analizar, Equipo, Técnicas
-- `analysis/` cálculo de ángulos y contador de repeticiones (con pruebas en `test/`) y dibujo del esqueleto
-
-```bash
-flutter pub get
-flutter analyze && flutter test
-flutter run                                   # con un móvil conectado
-flutter build apk --release --split-per-abi   # APKs en build/app/outputs/flutter-apk/
-```
-El APK de `arm64-v8a` sirve para casi todos los móviles actuales. Cada push también lo compila con GitHub Actions (`.github/workflows/build-apk.yml`).
-
-## Funciones (v0.2)
-- **Series guardadas:** cada serie queda en el móvil con ejercicio, brazo, peso, repeticiones, ángulos y tempo. Pantalla **Progreso** con gráficas por ejercicio.
-- **Informe de serie:** rango, tempo, repetición donde empieza la fatiga (el rango baja 15% o el tempo sube 25% frente a las 3 primeras reps; necesita 5 reps) y consejos por reglas.
-- **Guía de cámara:** contorno en pantalla, aviso de luz baja y de brazo fuera de cuadro.
-- **Grupo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase.
-- **Brazo derecho vs. izquierdo:** compara rango y tempo de los últimos 30 días.
+## Qué hace
+- **Analizar:** cámara con guía de encuadre, aviso de luz baja y de brazo fuera de cuadro. Detecta el brazo en el propio móvil, mide el ángulo, cuenta repeticiones y graba el vídeo.
+- **Informe de serie:** rango, tempo, repetición donde empieza la fatiga (el rango baja un 15% o el tempo sube un 25% frente a las 3 primeras reps; necesita 5 reps) y consejos.
+- **Cámara lenta:** revisión a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
+- **Progreso:** semana, gráficas de rango y peso por ejercicio, comparación brazo derecho contra izquierdo, historial y dolor reportado.
 - **Ejercicios:** press lateral, pronación, supinación, cup, rising y back pressure, cada uno con su articulación medida, objetivos y consejos de cámara. Los umbrales son valores iniciales y hay que ajustarlos con datos reales.
-- **Descanso:** temporizador con aviso sonoro y vibración, y peso por serie.
-- **Cámara lenta:** revisión del vídeo a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
-- **Plan semanal:** meta de días, ejercicio por día, racha de semanas y recordatorios.
-- **Dolor y notas:** zona, intensidad y nota por serie. En Progreso se ve junto al peso usado.
+- **Descanso:** temporizador con sonido y vibración, y peso por serie.
+- **Plan:** meta semanal, ejercicio por día, racha de semanas y exportación al calendario con aviso.
+- **Equipo:** login, código de invitación (máximo 10 personas), actividad semanal y comparación por ejercicio. Requiere Supabase (ver abajo).
 
-Límites conocidos: la pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta. El vídeo se graba en el móvil y no se sube. La revisión con esqueleto sobre el vídeo y la grabación con análisis simultáneo dependen del modelo de móvil y están sin probar en un dispositivo real.
+### Límites conocidos
+- La pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta.
+- Una app web no puede avisarte con la app cerrada. Por eso el recordatorio es un evento semanal para tu calendario.
+- El ángulo supone el móvil de lado y con el brazo completo a la vista. Si no, la medida sale mal.
+- La app guarda las series en el navegador del móvil. Si borras los datos del sitio o desinstalas, se pierden (con un grupo conectado se conserva el resumen en la nube).
+
+## Privacidad
+El análisis corre en tu móvil. El vídeo y los puntos del cuerpo no salen del dispositivo. La app bloquea cualquier conexión que no sea a su propio sitio o a tu proyecto de Supabase. Con un grupo conectado solo se suben los resúmenes de cada serie (ejercicio, peso, repeticiones, rango, tempo, dolor).
 
 ## Grupo (Supabase)
 1. Crea un proyecto gratis en supabase.com.
 2. En **SQL Editor** pega y ejecuta `supabase/schema.sql`.
 3. En **Authentication > Providers > Email** desactiva "Confirm email" si no quieres que cada persona confirme su correo.
-4. Copia la URL del proyecto y la clave publicable (Settings > API Keys).
-5. Compila con las claves:
-```bash
-flutter build apk --release --split-per-abi \
-  --dart-define=SUPABASE_URL=https://TU-PROYECTO.supabase.co \
-  --dart-define=SUPABASE_KEY=TU_CLAVE_PUBLICABLE
+4. En GitHub, en *Settings > Secrets and variables > Actions > Variables*, crea `SUPABASE_URL` (la URL del proyecto) y `SUPABASE_KEY` (la clave publicable).
+5. Lanza de nuevo el workflow **Deploy PWA** (pestaña Actions, Run workflow). La app se vuelve a publicar con el grupo activado.
+
+Las tablas tienen reglas de acceso: cada persona solo ve sus datos y los de su grupo.
+
+## Publicación
+Cada cambio en `pwa/` ejecuta `.github/workflows/deploy-pwa.yml`: pasa las pruebas y publica la carpeta en la rama `gh-pages`. En el repo hay que tener activado *Settings > Pages > Deploy from a branch > gh-pages / root*.
+
+## Desarrollo
+```text
+pwa/
+  index.html, manifest.webmanifest, sw.js   shell, instalación y modo sin conexión
+  css/app.css                               interfaz oscura con vidrio
+  js/analysis.js                            ángulos, repeticiones, fatiga, progreso (puro, con pruebas)
+  js/pose.js                                detección del brazo (MediaPipe) y dibujo del esqueleto
+  js/screens/                               Inicio, Analizar, Informe, Cámara lenta, Progreso, Equipo, Plan
+  vendor/                                   MediaPipe, modelo y cliente de Supabase incluidos (sin CDN)
+  tests/                                    pruebas con node --test
 ```
-En GitHub, guarda `SUPABASE_URL` y `SUPABASE_KEY` en *Settings > Secrets and variables > Actions > Variables* y el workflow las usa. Sin ellas la app funciona igual, solo sin grupo.
+```bash
+node --test pwa/tests/*.test.mjs      # pruebas del análisis
+python3 -m http.server -d pwa 8000     # probar en http://localhost:8000 (la cámara funciona en localhost)
+```
+Para probar en el móvil hace falta https, que da GitHub Pages.
 
-Solo se suben los resúmenes de cada serie (ejercicio, peso, reps, rango, tempo, dolor), nunca el vídeo. Las tablas tienen reglas de acceso: cada persona solo ve sus datos y los de su grupo.
+## Identidad
+- **Nombre:** Fulcro, el punto de apoyo de la palanca; en armwrestling, el codo sobre el pad.
+- **Logo:** `design/logo.svg` (pivote, antebrazo y arco del ángulo medido).
+- **Paleta:** cobre `#FF8A4C` (acción), turquesa `#3FE0C5` (ángulo bueno), ámbar `#FFB347` (atención), grafito `#0E1118`.
+- **Tipografías:** Unbounded (títulos) y Figtree (texto), incluidas en `pwa/fonts` (licencia SIL OFL).
+- **Modelo de negocio:** primero gratis para el grupo de entrenamiento; después plan Pro por suscripción.
 
-## Pendiente
-Firmar el APK con una clave propia antes de publicar en Google Play, iOS, y la comparación con referencias de profesionales (Pro).
-
-## Fuentes
-Figtree y Unbounded van incluidas en `assets/fonts` (licencia SIL Open Font License, ver los archivos `OFL-*.txt`), así que la app no necesita internet para verse bien.
+## App Android nativa (archivada)
+El proyecto Flutter (`lib/`, `android/`) queda en el repo como primera versión. No es la versión principal: en algunos móviles se cerraba al abrir. Se compila a mano desde la pestaña Actions con el workflow **Build APK**.

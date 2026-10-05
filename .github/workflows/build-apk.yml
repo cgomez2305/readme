@@ -1,8 +1,8 @@
+# The native Android app (Flutter) is kept in the repo but is no longer the main product.
+# Run it by hand from the Actions tab when needed.
 name: Build APK
 
 on:
-  push:
-    branches: ['**']
   workflow_dispatch:
 
 jobs:
@@ -21,15 +21,8 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - run: >
-          flutter build apk --release --split-per-abi
-          --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
-          --dart-define=SUPABASE_KEY=${{ vars.SUPABASE_KEY }}
-      # Universal APK (all CPU types in one file): works on any phone, but is larger.
-      - run: >
-          flutter build apk --release
-          --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
-          --dart-define=SUPABASE_KEY=${{ vars.SUPABASE_KEY }}
+      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
           name: fulcro-apk
