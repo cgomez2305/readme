@@ -3,7 +3,7 @@
 // (or the hold time), stores pose frames and records the video.
 // The selfie camera is the default; the front or back camera, or a specific lens, can be chosen.
 import {
-  state, subscribe, currentExercise, pickExercise, pickArm, setKg, setRestSeconds, setsToday, startRest, addRest, cancelRest,
+  state, subscribe, subscribeRest, currentExercise, pickExercise, pickArm, setKg, setRestSeconds, setsToday, startRest, addRest, cancelRest,
   setCam, setDeviceId, setOneRm, plannedItemFor,
 } from '../state.js';
 import { prescriptionText, pctText, itemKg } from '../plans.js';
@@ -351,6 +351,7 @@ export function mount(root, api) {
     }
     renderChrome(); // button label, live metrics and hints all depend on the exercise
   });
+  const offRest = subscribeRest(() => { if (alive) renderRest(); });
   const offOverlay = api.onOverlay((open) => { paused = open; });
   const onVisible = async () => {
     if (document.visibilityState === 'visible' && stream && !wakeLock) {
@@ -370,6 +371,6 @@ export function mount(root, api) {
     try { wakeLock?.release(); } catch { /* ignore */ }
     document.removeEventListener('visibilitychange', onVisible);
     root.removeEventListener('change', onChange);
-    offClick(); offState(); offOverlay();
+    offClick(); offState(); offRest(); offOverlay();
   };
 }

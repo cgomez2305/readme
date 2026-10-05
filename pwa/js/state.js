@@ -44,6 +44,15 @@ export const subscribe = (fn) => {
 };
 export const notify = () => listeners.forEach((fn) => fn());
 
+// The rest timer ticks every second and only the Analizar tab shows it, so it has its own channel.
+// Everything else keeps its focus and scroll while the countdown runs.
+const restListeners = new Set();
+export const subscribeRest = (fn) => {
+  restListeners.add(fn);
+  return () => restListeners.delete(fn);
+};
+const notifyRest = () => restListeners.forEach((fn) => fn());
+
 const persistPrefs = () =>
   store.savePrefs({
     exerciseId: state.exerciseId, arm: state.arm, kg: state.kg, restSeconds: state.restSeconds,
@@ -200,19 +209,19 @@ export function startRest() {
       state.restLeft = null;
       beep();
     }
-    notify();
+    notifyRest();
   }, 1000);
-  notify();
+  notifyRest();
 }
 export function addRest(seconds) {
   if (state.restLeft != null) {
     state.restLeft += seconds;
-    notify();
+    notifyRest();
   }
 }
 export function cancelRest() {
   clearInterval(restTimer);
   state.restLeft = null;
-  notify();
+  notifyRest();
 }
 export { exercises };
