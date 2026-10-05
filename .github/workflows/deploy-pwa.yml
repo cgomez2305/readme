@@ -1,4 +1,4 @@
-# Publishes the PWA to the gh-pages branch. SUPABASE_URL and SUPABASE_KEY (repository variables) are written into config.js.
+# Publishes the PWA to the gh-pages branch. SUPABASE_URL and SUPABASE_KEY (repository variables or secrets) are written into config.js.
 name: Deploy PWA
 
 on:
@@ -26,8 +26,8 @@ jobs:
         run: node --test pwa/tests/*.test.mjs
       - name: Write config and cache version
         env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_KEY || secrets.SUPABASE_KEY }}
         run: |
           printf "window.FULCRO_CONFIG = { supabaseUrl: '%s', supabaseKey: '%s' };\n" "$SUPABASE_URL" "$SUPABASE_KEY" > pwa/config.js
           sed -i "s/__VERSION__/${GITHUB_SHA::7}/" pwa/sw.js
