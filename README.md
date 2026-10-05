@@ -65,3 +65,18 @@ Interfaz oscura, tipografía fuerte y esqueleto en neón sobre el vídeo; protot
 - **Paleta:** cobre `#FF8A4C` (acción), turquesa `#3FE0C5` (ángulo bueno), ámbar `#FFB347` (atención), grafito `#0E1118`.
 - **Tipografías:** Unbounded (títulos) y Figtree (texto).
 - **Modelo de negocio:** primero gratis para el grupo de entrenamiento; después plan Pro por suscripción.
+
+## Desarrollo
+Proyecto Flutter (solo Android por ahora). Código en `lib/`:
+- `theme/` colores y tipografías · `widgets/` vidrio, botones, logo · `screens/` Inicio, Analizar, Equipo, Técnicas
+- `analysis/` cálculo de ángulos y contador de repeticiones (con pruebas en `test/`) y dibujo del esqueleto
+
+```bash
+flutter pub get
+flutter analyze && flutter test
+flutter run                                   # con un móvil conectado
+flutter build apk --release --split-per-abi   # APKs en build/app/outputs/flutter-apk/
+```
+El APK de `arm64-v8a` sirve para casi todos los móviles actuales. Cada push a `main` también lo compila con GitHub Actions (`.github/workflows/build-apk.yml`).
+
+Estado v0.1: la pantalla **Analizar** abre la cámara trasera, detecta el brazo con ML Kit, mide el ángulo del codo y cuenta repeticiones en vivo. Inicio, Equipo y Técnicas usan datos de ejemplo. Falta: guardar sesiones, login, y firmar el APK con una clave propia antes de publicar en Google Play.
