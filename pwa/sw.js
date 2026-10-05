@@ -4,7 +4,7 @@ const SHELL_CACHE = 'fulcro-shell-__VERSION__'; // __VERSION__ is replaced with 
 const HEAVY_CACHE = 'fulcro-heavy-v1';
 const CORE = [
   './', 'index.html', 'config.js', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/state.js', 'js/store.js', 'js/ui.js', 'js/charts.js', 'js/analysis.js', 'js/exercises.js', 'js/pose.js', 'js/cloud.js',
+  'js/app.js', 'js/state.js', 'js/store.js', 'js/ui.js', 'js/charts.js', 'js/analysis.js', 'js/exercises.js', 'js/pose.js', 'js/cloud.js', 'js/plans.js',
   'js/screens/home.js', 'js/screens/analyze.js', 'js/screens/progress.js', 'js/screens/team.js', 'js/screens/plan.js',
   'js/screens/report.js', 'js/screens/replay.js',
 ];
