@@ -77,6 +77,6 @@ flutter analyze && flutter test
 flutter run                                   # con un móvil conectado
 flutter build apk --release --split-per-abi   # APKs en build/app/outputs/flutter-apk/
 ```
-El APK de `arm64-v8a` sirve para casi todos los móviles actuales. Cada push a `main` también lo compila con GitHub Actions (`.github/workflows/build-apk.yml`).
+El APK de `arm64-v8a` sirve para casi todos los móviles actuales. Cada push también lo compila con GitHub Actions (`.github/workflows/build-apk.yml`).
 
 Estado v0.1: la pantalla **Analizar** abre la cámara trasera, detecta el brazo con ML Kit, mide el ángulo del codo y cuenta repeticiones en vivo. Inicio, Equipo y Técnicas usan datos de ejemplo. Falta: guardar sesiones, login, y firmar el APK con una clave propia antes de publicar en Google Play.
