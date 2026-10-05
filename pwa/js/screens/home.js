@@ -32,7 +32,7 @@ function sessionCard(planned, ex, done) {
       ${eyebrow(KIND_TEXT[sess.kind] ?? 'Hoy')}
       <div class="bold" style="font-size:20px;margin:4px 0 6px">${esc(sess.title)}</div>
       <div class="muted small">${esc(sess.note ?? '')}</div>
-      <button class="btn ghost" data-analyze="${ex.id}" style="margin-top:12px">Entrenar de todos modos</button></div>`;
+      <button class="btn ghost" data-go="plan" style="margin-top:12px">Ver mi plan</button></div>`;
   }
   return `<div class="glass">
     ${eyebrow('Sin plan todavía')}

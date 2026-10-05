@@ -1,9 +1,9 @@
 // Report of one series. A new series offers Save / Discard; a saved one allows editing notes
 // and pain, watching the video and deleting.
 import { state, addSet, updateSet, deleteSet } from '../state.js';
-import { exerciseById, jointLabel, armLabel, painZones, isHold } from '../exercises.js';
+import { exerciseById, jointLabel, armLabel, painZones, isHold, repDelta } from '../exercises.js';
 import {
-  summarize, summarizeHold, intensityTips, frequencyTips, weeklyDaysFor, repRange, repDuration, formatDay, formatTime, fmtKg,
+  summarize, summarizeHold, diagnoseSet, intensityTips, frequencyTips, weeklyDaysFor, repRange, repDuration, formatDay, formatTime, fmtKg,
 } from '../analysis.js';
 import { esc, eyebrow, metric, seg, on, icon, toast } from '../ui.js';
 import { repBars } from '../charts.js';
@@ -18,7 +18,8 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
     const h = hold ? summarizeHold(set.dur, set.sd) : null;
     // Guidelines: weight against the 1RM and weekly frequency, counted up to the day of this set.
     const days = weeklyDaysFor(isNew ? [...state.sets, set] : state.sets, ex.id, new Date(set.at));
-    const tips = [...(h ? h.tips : s.tips), ...intensityTips(ex, set.kg, state.oneRm[ex.id]), ...frequencyTips(ex, days, state.plan.sparring)];
+    const diag = diagnoseSet(set, ex, repDelta(ex));
+    const tips = [...(!hold && s.reps < 3 ? diag : []), ...(h ? h.tips : s.tips), ...(hold || s.reps >= 3 ? diag : []), ...intensityTips(ex, set.kg, state.oneRm[ex.id]), ...frequencyTips(ex, days, state.plan.sparring)];
     const fatIdx = s.fatigueRep == null ? undefined : s.fatigueRep - 1;
     const tipIcon = { good: ['✓', 'var(--teal)'], warn: ['!', 'var(--warn)'], info: ['i', 'var(--muted)'] };
     const note = root.querySelector('#r-note')?.value ?? set.note;
@@ -26,7 +27,7 @@ export function mount(root, api, { set, isNew, frames = [], blob = null, onSaved
       <div class="row"><button class="icon-btn" id="r-back" aria-label="Volver">${icon('back')}</button>
         <div class="grow">${eyebrow(isNew ? 'Informe de la serie' : `${formatDay(new Date(set.at))} · ${formatTime(new Date(set.at))}`)}</div></div>
       <div><div class="title">${esc(ex.name)}</div>
-        <div class="muted small" style="margin-top:4px">Brazo ${armLabel(set.arm).toLowerCase()} · ${fmtKg(set.kg)} kg · ${Math.round(set.dur / 1000)} s</div></div>
+        <div class="muted small" style="margin-top:4px">Brazo ${armLabel(set.arm).toLowerCase()} · ${fmtKg(set.kg)} kg · ${Math.round(set.dur / 1000)} s${set.cov != null ? ` · brazo visto el ${Math.round(set.cov * 100)}%` : ''}</div></div>
       <div class="grid2">
         ${hold ? `
           ${metric('Tiempo bajo tensión', `${Math.round(h.seconds)} s`)}

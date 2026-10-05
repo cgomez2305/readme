@@ -11,7 +11,10 @@ App web instalable (PWA) que analiza tus ejercicios de armwrestling con la cáma
 Necesita la cámara (la app pide permiso la primera vez). Después de la primera visita funciona sin conexión, incluido el análisis.
 
 ## Qué hace
-- **Analizar:** cámara con aviso de luz baja y de brazo fuera de cuadro. Detecta el brazo en el propio móvil, mide el ángulo, cuenta repeticiones y graba el vídeo.
+- **Analizar:** cámara con aviso de luz baja y de brazo fuera de cuadro. Detecta el brazo en el propio móvil, mide el ángulo, cuenta repeticiones y graba el vídeo. Con un plan activo solo deja elegir los ejercicios de ese día, y en días de descanso o sparring no abre la cámara.
+- **Conteo de repeticiones:** una repetición es un ciclo completo (arriba, abajo y arriba) y cada tramo tiene que moverse al menos la mitad del rango objetivo del ejercicio (mínimo 8°). No depende de ángulos absolutos, así que funciona con cualquier posición de cámara. Para ejercicios de muñeca no hace falta que se vea el hombro.
+- **Si no cuenta nada, te explica por qué:** el informe dice cuánto tiempo vio tu brazo, cuánto se movió el ángulo y qué cambiar. En vivo avisa de "No veo tu brazo" y, si ve el otro brazo, te deja cambiar con un toque.
+- **Borrar grabaciones:** elimina una serie (también desde Analizar, justo después de grabar), todas las de un día (toca el día en Progreso) o reinicia la semana entera. Siempre pide confirmación y borra también el vídeo y, con un grupo conectado, el resumen compartido.
 - **Cámara a elegir:** usa la **cámara frontal (selfie)** por defecto, para que te veas mientras entrenas. Se puede cambiar a la trasera, o elegir un lente concreto si el móvil tiene varios. La elección se recuerda.
 - **Informe de serie:** rango, tempo, repetición donde empieza la fatiga (el rango baja un 15% o el tempo sube un 25% frente a las 3 primeras reps; necesita 5 reps) y consejos.
 - **Cámara lenta:** revisión a 0.25x, 0.5x o 1x con el esqueleto encima, el punto de fatiga y marcas propias.
@@ -83,7 +86,8 @@ Si tienes menos días, el plan sigue cumpliendo las reglas pero avisa de lo que 
 - La pronación y la supinación son rotaciones y una cámara 2D solo las ve de forma indirecta.
 - Una app web no puede avisarte con la app cerrada. Por eso el recordatorio es un evento semanal para tu calendario.
 - El brazo completo tiene que verse en la imagen. Si no, la medida sale mal.
-- Los umbrales de cada ejercicio (qué cuenta como repetición, rango y tempo) son valores iniciales y hay que ajustarlos con datos reales.
+- Los objetivos de cada ejercicio (rango y tempo) son valores iniciales y hay que ajustarlos con datos reales.
+- La detección necesita ver una parte del cuerpo suficiente: si solo se ve la mano y el antebrazo muy de cerca, puede no encontrar a la persona. Con la cámara frontal, apoya el móvil de modo que se vean el codo y la mano, y mejor también el torso.
 - La app guarda las series en el navegador del móvil. Si borras los datos del sitio o desinstalas, se pierden (con un grupo conectado se conserva el resumen en la nube).
 
 ## Privacidad

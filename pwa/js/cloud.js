@@ -129,6 +129,16 @@ export async function pushSet(set) {
   }
 }
 
+/** Removes set summaries from the group's copy. Failures are silent: the local delete already happened. */
+export async function deleteSets(ids) {
+  if (!client || !signedIn() || !ids.length) return;
+  try {
+    await client.from('sets').delete().in('id', ids);
+  } catch (e) {
+    console.warn('Fulcro: no se pudieron borrar las series de la nube', e);
+  }
+}
+
 export async function activity() {
   const { data, error } = await client.rpc('group_activity');
   if (error) throw error;

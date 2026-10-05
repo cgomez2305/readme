@@ -4,21 +4,47 @@
 // The selfie camera is the default; the front or back camera, or a specific lens, can be chosen.
 import {
   state, subscribe, subscribeRest, currentExercise, pickExercise, pickArm, setKg, setRestSeconds, setsToday, startRest, addRest, cancelRest,
-  setCam, setDeviceId, setOneRm, plannedItemFor,
+  setCam, setDeviceId, setOneRm, plannedItemFor, hasPlan, todaySession,
 } from '../state.js';
+import { openDeleteSet, setLine } from './manage.js';
 import { prescriptionText, pctText, itemKg } from '../plans.js';
 import {
-  exercises, jointLabel, isHold, freqText, freqMax, intensityText, recommendedKg, intensityStatus,
+  exercises, exerciseById, jointLabel, isHold, freqText, freqMax, intensityText, recommendedKg, intensityStatus, repDelta,
 } from '../exercises.js';
-import { RepTracker, detectFatigue, stdDev, weeklyDaysFor } from '../analysis.js';
-import { loadLandmarker, readArm, drawArm } from '../pose.js';
-import { esc, eyebrow, pill, metric, seg, on } from '../ui.js';
+import { RepTracker, Smoother, detectFatigue, stdDev, weeklyDaysFor } from '../analysis.js';
+import { loadLandmarker, readArm, drawArm, trackedAngle } from '../pose.js';
+import { esc, eyebrow, pill, metric, seg, on, toast } from '../ui.js';
 
 const MIME_CANDIDATES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
 const pickMime = () => (typeof MediaRecorder === 'undefined' ? null : MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m)) ?? null);
 const kgText = (v) => `${Math.round(v * 10) / 10}`;
 
+/** With an active plan only today's planned exercises can be trained. Without a plan, any exercise. */
+const planRestricted = () => hasPlan();
+const allowedExercises = () => (planRestricted() ? (todaySession()?.items ?? []).map((i) => exerciseById(i.ex)) : exercises);
+
+/** Rest and sparring days: no camera, just what the plan says. */
+function mountRestDay(root, api) {
+  const s = todaySession();
+  const wd = ((new Date().getDay() + 6) % 7) + 1;
+  const tomorrow = state.plan.sessions?.[(wd % 7) + 1];
+  root.innerHTML = `<div class="col">
+    <div>${eyebrow('Analizar')}<div class="title">${s?.kind === 'sparring' ? 'Hoy hay sparring' : 'Hoy toca descansar'}</div></div>
+    <div class="glass"><div class="bold">${esc(s?.title ?? 'Descanso')}</div>
+      <p class="muted small" style="margin-top:6px">${esc(s?.note ?? 'Tu plan no tiene ejercicios para hoy.')}</p>
+      <p class="muted small" style="margin-top:10px">Analizar solo muestra los ejercicios del día según tu plan.${tomorrow?.items.length ? ` Mañana: <b style="color:var(--text)">${esc(tomorrow.title)}</b>.` : ''}</p></div>
+    <button class="btn" id="rd-plan">Ver mi plan</button>
+    <p class="muted tiny center">Si quieres otro ejercicio hoy, edita el día en Plan.</p></div>`;
+  const off = on(root, { '#rd-plan': () => api.go('plan') });
+  return () => off();
+}
+
 export function mount(root, api) {
+  if (planRestricted() && allowedExercises().length === 0) return mountRestDay(root, api);
+  if (planRestricted() && !allowedExercises().some((e) => e.id === state.exerciseId)) {
+    const items = todaySession().items;
+    pickExercise((items.find((i) => setsToday(i.ex) < i.sets) ?? items[0]).ex);
+  }
   // The camera comes first so you can see yourself; the settings sit below it.
   root.innerHTML = `<div class="col">
     <div id="a-head"></div>
@@ -32,6 +58,7 @@ export function mount(root, api) {
     </div>
     <div class="wrap" id="a-status"></div>
     <div id="a-rest"></div>
+    <div id="a-last"></div>
     <div class="grid3" id="a-live"></div>
     <div id="a-setup" class="stack"></div>
     <div class="glass" id="a-tip"></div>
@@ -50,6 +77,9 @@ export function mount(root, api) {
   let mirrored = state.cam === 'user';
   let recording = false, tracker = null, frames = [], recorder = null, chunks = [], t0 = 0, startedAt = new Date();
   let reading = null, brightness = 128, lastRepMs = 0, elapsedMs = 0;
+  // Detection quality while recording, so a failed set can be explained.
+  const smoother = new Smoother(0.5);
+  let recFrames = 0, recSeen = 0, obsMin = Infinity, obsMax = -Infinity, lostSince = 0, otherSeen = 0;
 
   const ex = () => currentExercise();
 
@@ -61,7 +91,7 @@ export function mount(root, api) {
     const item = plannedItemFor(e.id); // today's prescription from the plan, if this exercise is in it
     const kg = item && itemKg(item, state.oneRm[e.id]);
     $('#a-head').innerHTML = `${eyebrow(`Serie ${setsToday(e.id) + 1} de ${item?.sets ?? e.defaultSets} · hoy`)}
-      <button class="title" id="a-pick" style="background:none;border:0;color:inherit;padding:2px 0;text-align:left;cursor:pointer" ${recording ? 'disabled' : ''}>${esc(e.name)} ${recording ? '' : '▾'}</button>
+      <button class="title" id="a-pick" style="background:none;border:0;color:inherit;padding:2px 0;text-align:left;cursor:pointer" ${recording || allowedExercises().length < 2 ? 'disabled' : ''}>${esc(e.name)} ${recording || allowedExercises().length < 2 ? '' : '▾'}</button>
       <div class="muted small">${isHold(e) ? 'Mide: tiempo y firmeza de la muñeca' : `Mide: ${jointLabel(e).toLowerCase()}`} · ${esc(e.focus)}</div>
       ${item ? `<div class="glass good" style="margin-top:10px;padding:10px 14px"><div class="small"><b>Plan de hoy:</b> ${esc(prescriptionText(item))} · ${esc(pctText(item))} del 1RM${kg ? ` (${kg.low === kg.high ? kg.low : `${kg.low}-${kg.high}`} kg)` : ''} · descanso ${item.rest} s</div>
         ${item.extraArm ? `<div class="tiny" style="color:var(--amber);margin-top:2px">+1 serie con el brazo ${item.extraArm === 'left' ? 'izquierdo' : 'derecho'} (más débil)</div>` : ''}
@@ -94,6 +124,17 @@ export function mount(root, api) {
         <button class="btn ghost small" id="a-1rm">${rec ? 'Cambiar 1RM' : 'Definir 1RM'}</button></div>
       <div class="row"><span class="muted small">Descanso</span><div class="grow">${seg('rest', [[60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min']], state.restSeconds)}</div></div>`;
   }
+  /** The newest set saved today, with a quick way to delete a recording that did not turn out well. */
+  function renderLast() {
+    const n = new Date();
+    const last = state.sets.find((x) => {
+      const d = new Date(x.at);
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    });
+    $('#a-last').innerHTML = last && !recording
+      ? `<div class="glass row" style="padding:10px 14px"><div class="grow"><div class="tiny muted">Última serie guardada hoy</div><div class="small">${esc(setLine(last))}</div></div>
+          <button class="btn ghost small" data-lastdel="${esc(last.id)}">Eliminar</button></div>` : '';
+  }
   function renderRest() {
     const left = state.restLeft;
     $('#a-rest').innerHTML = left == null ? '' : `<div class="glass accent center">
@@ -102,18 +143,22 @@ export function mount(root, api) {
   }
   function renderLive() {
     const e = ex();
-    const tracked = reading ? (e.joint === 'elbow' ? reading.elbowAngle : reading.wristAngle) : null;
+    const tracked = trackedAngle(reading, e.joint);
+    const swing = obsMax > obsMin ? Math.round(obsMax - obsMin) : 0;
     $('#a-live').innerHTML = metric(jointLabel(e), tracked == null ? '--' : `${Math.round(tracked)}°`)
       + (isHold(e)
         ? metric('Tiempo', recording ? `${(elapsedMs / 1000).toFixed(0)} s` : '--') + metric('Peso', `${state.kg} kg`)
-        : metric('Repeticiones', String(tracker?.reps.length ?? 0)) + metric('Última rep', lastRepMs ? `${(lastRepMs / 1000).toFixed(1)}s` : '--'));
+        : metric('Repeticiones', String(tracker?.reps.length ?? 0)) + metric('Rango visto', recording && swing ? `${swing}°` : '--'));
     const lightOk = brightness >= 55, armOk = Boolean(reading?.inFrame);
+    const lost = recording && !reading && performance.now() - lostSince > 1200;
     $('#a-status').innerHTML = pill(lightOk ? 'Luz buena' : 'Luz baja', lightOk ? 'good' : 'warn')
       + pill(!reading ? 'Buscando brazo' : armOk ? 'Brazo visible' : 'Brazo fuera de cuadro', armOk ? 'good' : 'warn')
+      + (lost ? pill('No veo tu brazo', 'bad') : '')
+      + (otherSeen > 8 && !reading ? `<button class="chip on" data-switcharm style="border-color:var(--warn);color:var(--warn)">Veo tu otro brazo · Cambiar</button>` : '')
       + (lightOk && armOk && !recording ? pill('Listo para grabar', 'good') : '');
   }
   function renderChrome() {
-    renderHead(); renderSetup(); renderRest(); renderLive();
+    renderHead(); renderSetup(); renderRest(); renderLast(); renderLive();
     const badge = $('#badge'), msg = $('#msg'), rec = $('#a-rec');
     badge.innerHTML = recording
       ? `<span class="pill bad"><span class="rec-dot"></span>Grabando${recorder ? '' : ' (sin vídeo)'}</span>`
@@ -216,20 +261,36 @@ export function mount(root, api) {
     let result;
     try { result = globalThis.__FAKE_DETECT?.(now) ?? landmarker.detectForVideo(video, now); } catch { return; } // __FAKE_DETECT: test hook
     const e = ex();
-    reading = readArm(result.landmarks?.[0], state.arm, video.videoWidth, video.videoHeight);
-    const tracked = reading ? (e.joint === 'elbow' ? reading.elbowAngle : reading.wristAngle) : null;
+    const lm = result.landmarks?.[0];
+    reading = readArm(lm, state.arm, video.videoWidth, video.videoHeight, e.joint);
+    // Is the other arm the one being seen? Then the wrong side may be selected.
+    otherSeen = !reading && readArm(lm, state.arm === 'left' ? 'right' : 'left', video.videoWidth, video.videoHeight, e.joint) ? otherSeen + 1 : 0;
+    let tracked = null;
+    if (reading) {
+      tracked = smoother.push(trackedAngle(reading, e.joint));
+      lostSince = 0;
+    } else {
+      if (!lostSince) lostSince = now;
+      if (now - lostSince > 600) smoother.reset();
+    }
     drawArm(ctx, reading?.p, e.joint, tracked, mirrored);
 
-    if (recording && reading) {
-      const t = now - t0;
-      if (tracker) {
-        tracker.add(t, tracked, reading.wristAngle);
-        const last = tracker.reps.at(-1);
-        if (last) lastRepMs = last.e - last.s;
+    if (recording) {
+      recFrames++;
+      if (reading) {
+        const t = now - t0;
+        recSeen++;
+        obsMin = Math.min(obsMin, tracked);
+        obsMax = Math.max(obsMax, tracked);
+        if (tracker) {
+          tracker.add(t, tracked, reading.wristAngle);
+          const last = tracker.reps.at(-1);
+          if (last) lastRepMs = last.e - last.s;
+        }
+        frames.push({ t: Math.round(t), p: reading.p.map((v) => Math.round(v * 1e4) / 1e4), a: Math.round(tracked * 10) / 10 });
       }
-      frames.push({ t: Math.round(t), p: reading.p.map((v) => Math.round(v * 1e4) / 1e4), a: Math.round(tracked * 10) / 10 });
+      elapsedMs = now - t0;
     }
-    if (recording) elapsedMs = now - t0;
     if (++frameCount % 10 === 0) {
       lctx.drawImage(video, 0, 0, 16, 16);
       const d = lctx.getImageData(0, 0, 16, 16).data;
@@ -243,8 +304,9 @@ export function mount(root, api) {
   // ---- recording ------------------------------------------------------------------------------
   function start() {
     const e = ex();
-    tracker = isHold(e) ? null : new RepTracker(e.openAbove, e.closedBelow);
+    tracker = isHold(e) ? null : new RepTracker(repDelta(e));
     frames = []; chunks = []; lastRepMs = 0; elapsedMs = 0;
+    recFrames = 0; recSeen = 0; obsMin = Infinity; obsMax = -Infinity; lostSince = 0;
     startedAt = new Date();
     recorder = null;
     const mime = pickMime();
@@ -279,6 +341,9 @@ export function mount(root, api) {
     };
     const fat = detectFatigue(reps);
     if (fat) set.fat = fat;
+    // how well the arm was followed, so the report can explain a set with few repetitions
+    set.cov = recFrames ? Math.round((recSeen / recFrames) * 100) / 100 : 0;
+    if (recSeen) set.obs = [Math.round(obsMin), Math.round(obsMax)];
     if (isHold(e) && frames.length >= 10) set.sd = Math.round(stdDev(frames.map((f) => f.a)) * 10) / 10;
     renderChrome();
     api.openReport({ set, isNew: true, frames, blob, onSaved: () => startRest() });
@@ -298,15 +363,19 @@ export function mount(root, api) {
   }
 
   function openPicker() {
-    openSheet(`<div class="title" style="margin-bottom:4px">Ejercicio</div>
-      <div class="muted tiny" style="margin-bottom:12px">Frecuencia e intensidad: guía básica, no sustituye a un entrenador.</div><div class="stack">
-      ${exercises.map((e) => `<button class="glass ${e.id === state.exerciseId ? 'good' : ''}" data-ex="${e.id}" style="text-align:left;cursor:pointer;color:inherit">
-        <div class="row"><div class="grow bold" style="font-size:16px">${esc(e.name)}</div>${pill(isHold(e) ? 'Retención' : jointLabel(e))}</div>
+    const list = allowedExercises();
+    openSheet(`<div class="title" style="margin-bottom:4px">${planRestricted() ? 'Ejercicios de hoy' : 'Ejercicio'}</div>
+      <div class="muted tiny" style="margin-bottom:12px">${planRestricted()
+        ? 'Solo aparecen los ejercicios de tu plan para hoy. Para cambiarlos, edita el día en Plan.'
+        : 'Frecuencia e intensidad: guía básica, no sustituye a un entrenador.'}</div><div class="stack">
+      ${list.map((e) => { const it = plannedItemFor(e.id); return `<button class="glass ${e.id === state.exerciseId ? 'good' : ''}" data-ex="${e.id}" style="text-align:left;cursor:pointer;color:inherit">
+        <div class="row"><div class="grow bold" style="font-size:16px">${esc(e.name)}</div>${it ? pill(`${setsToday(e.id)}/${it.sets}`, setsToday(e.id) >= it.sets ? 'good' : '') : ''}${pill(isHold(e) ? 'Retención' : jointLabel(e))}</div>
         <div class="muted small">${esc(e.focus)}</div>
+        ${it ? `<div class="small" style="margin-top:6px"><b>Hoy:</b> ${esc(prescriptionText(it))} · ${esc(pctText(it))} del 1RM</div>` : ''}
         <div class="small" style="margin-top:8px">${e.cues.map((c) => `· ${esc(c)}`).join('<br>')}</div>
         <div class="tiny" style="margin-top:8px;color:var(--teal)">${esc(freqText(e, state.plan.sparring))} · ${esc(intensityText(e))}</div>
         ${isHold(e) ? '' : `<div class="muted tiny" style="margin-top:4px">Objetivo: ${e.minRange}° de rango · ${(e.tempoMinMs / 1000).toFixed(1)} a ${(e.tempoMaxMs / 1000).toFixed(1)} s por rep</div>`}
-        ${e.precision !== 'Alta' ? `<div class="tiny" style="color:var(--amber);margin-top:4px">Precisión: ${esc(e.precision)}</div>` : ''}</button>`).join('')}
+        ${e.precision !== 'Alta' ? `<div class="tiny" style="color:var(--amber);margin-top:4px">Precisión: ${esc(e.precision)}</div>` : ''}</button>`; }).join('')}
     </div>`, (ev, close) => {
       const b = ev.target.closest('[data-ex]');
       if (b) { pickExercise(b.dataset.ex); close(); }
@@ -332,7 +401,9 @@ export function mount(root, api) {
     '#a-1rm': open1Rm,
     '#a-rec': () => (recording ? stop() : start()),
     '[data-seg="arm"]': (el) => pickArm(el.dataset.v),
+    '[data-switcharm]': () => { otherSeen = 0; pickArm(state.arm === 'left' ? 'right' : 'left'); toast('Brazo cambiado.'); },
     '[data-seg="cam"]': (el) => setCam(el.dataset.v),
+    '[data-lastdel]': (el) => openDeleteSet(el.dataset.lastdel),
     '#a-flip': () => { if (!recording) setCam(mirrored ? 'environment' : 'user'); },
     '[data-seg="rest"]': (el) => setRestSeconds(Number(el.dataset.v)),
     '[data-kg]': (el) => setKg(state.kg + Number(el.dataset.kg)),

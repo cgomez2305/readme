@@ -6,6 +6,8 @@ import {
 } from '../analysis.js';
 import { esc, eyebrow, pill, chips, on } from '../ui.js';
 import { trendChart } from '../charts.js';
+import { openDaySheet, openDeleteSet, openResetWeek } from './manage.js';
+import { setsInWeek } from '../analysis.js';
 
 let exerciseId = null; // remembered while the app is open
 
@@ -26,6 +28,7 @@ export function mount(root, api) {
     const days = trainingDaysInWeek(state.sets, now);
     const goal = state.plan.goal;
     const todayMs = dayOf(now).getTime();
+    const weekCount = setsInWeek(state.sets, now).length;
 
     const armBar = (label, v, max, sub) => `
       <div class="row" style="margin-top:8px"><div style="width:78px;font-size:13px">${label}</div>
@@ -40,9 +43,13 @@ export function mount(root, api) {
         <div class="dayrow" style="margin-top:12px">
           ${weekdayShort.map((l, i) => {
             const t = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i).getTime();
-            return `<div><div class="day ${trained.has(t) ? 'done' : ''} ${t === todayMs ? 'today' : ''}">${trained.has(t) ? '✓' : ''}</div><div class="muted tiny">${l}</div></div>`;
+            return `<div>${trained.has(t)
+              ? `<button class="day done ${t === todayMs ? 'today' : ''}" data-day="${t}" aria-label="Ver o eliminar series del ${l}" style="cursor:pointer;border-width:2px;border-style:solid">✓</button>`
+              : `<div class="day ${t === todayMs ? 'today' : ''}"></div>`}<div class="muted tiny">${l}</div></div>`;
           }).join('')}
         </div>
+        <div class="row" style="margin-top:8px"><span class="grow muted tiny">Toca un día con ✓ para ver o eliminar sus series.</span>
+          ${weekCount ? '<button class="btn ghost small" id="reset-week">Reiniciar semana</button>' : ''}</div>
       </div>
       ${chips('ex', exercises.map((e) => [e.id, e.name]), ex.id)}
       ${exSets.length === 0
@@ -69,6 +76,7 @@ export function mount(root, api) {
           <div class="grow"><div class="bold">${esc(exerciseById(s.ex).name)}</div>
             <div class="muted tiny">${formatDay(new Date(s.at))} · brazo ${armLabel(s.arm).toLowerCase()} · ${fmtKg(s.kg)} kg</div></div>
           ${s.video ? '<span title="Con vídeo">🎞</span>' : ''}${s.pz ? '<span title="Con dolor">⚠</span>' : ''}
+          <button class="icon-btn" data-delset="${esc(s.id)}" aria-label="Eliminar serie" style="width:34px;height:34px">🗑</button>
           <div class="bold small">${isHold(exerciseById(s.ex)) ? `${Math.round(s.dur / 1000)} s` : `${s.reps.length} reps · ${Math.round(setAvgRange(s))}°`}</div>
         </div>`).join('')}
     </div>`;
@@ -77,6 +85,9 @@ export function mount(root, api) {
   const off = subscribe(render);
   const offClick = on(root, {
     '[data-chip="ex"]': (el) => { exerciseId = el.dataset.v; render(); },
+    '[data-day]': (el) => openDaySheet(el.dataset.day),
+    '#reset-week': () => openResetWeek(),
+    '[data-delset]': (el) => openDeleteSet(el.dataset.delset),
     '[data-open]': (el) => {
       const set = state.sets.find((s) => s.id === el.dataset.open);
       if (set) api.openReport({ set, isNew: false });

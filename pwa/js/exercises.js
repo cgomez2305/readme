@@ -2,7 +2,8 @@
 //
 // mode 'reps': a joint angle is tracked and repetitions are counted.
 //   joint 'elbow' = shoulder-elbow-wrist, 'wrist' = elbow-wrist-index.
-//   A rep starts when the angle drops below openAbove and counts once it goes below closedBelow and returns.
+//   A rep is one full cycle (top -> bottom -> top). Each leg has to move at least repDelta(ex) degrees, so it works
+//   whatever absolute angles the camera sees (a relaxed wrist is rarely 180 degrees).
 // mode 'hold': isometric work. The app records time under tension and how steady the wrist stays.
 //
 // perWeek / intensity are basic guidelines from a coach, not medical advice:
@@ -11,14 +12,14 @@
 export const exercises = [
   {
     id: 'rising', name: 'Rising', focus: 'Muñeca (desviación radial) y pulgar', joint: 'wrist', mode: 'reps',
-    openAbove: 170, closedBelow: 150, minRange: 20, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
+    minRange: 20, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
     cues: ['Antebrazo apoyado', 'Sube la mano hacia el pulgar', 'Baja controlado'],
     camera: 'Con la mano de cara a la cámara y la muñeca visible.', precision: 'Media',
     perWeek: { max: 2 }, intensity: { min: 60, max: 60 },
   },
   {
     id: 'pronation', name: 'Pronación', focus: 'Antebrazo y dedos', joint: 'wrist', mode: 'reps',
-    openAbove: 165, closedBelow: 140, minRange: 25, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
+    minRange: 25, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
     cues: ['Codo fijo', 'Rota desde el antebrazo, no desde el hombro', 'Controla la bajada'],
     camera: 'De frente a la mano, con el antebrazo y la muñeca visibles.',
     precision: 'Baja: la rotación se ve en 2D solo de forma indirecta',
@@ -26,7 +27,7 @@ export const exercises = [
   },
   {
     id: 'supination', name: 'Supinación', focus: 'Antebrazo y bíceps', joint: 'wrist', mode: 'reps',
-    openAbove: 165, closedBelow: 140, minRange: 25, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
+    minRange: 25, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
     cues: ['Codo fijo', 'Gira hacia fuera sin abrir el codo', 'No muevas el hombro'],
     camera: 'De frente a la mano, con el antebrazo y la muñeca visibles.',
     precision: 'Baja: la rotación se ve en 2D solo de forma indirecta',
@@ -34,21 +35,21 @@ export const exercises = [
   },
   {
     id: 'cup', name: 'Cupping', focus: 'Muñeca y dedos', joint: 'wrist', mode: 'reps',
-    openAbove: 165, closedBelow: 130, minRange: 35, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
+    minRange: 35, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
     cues: ['Antebrazo apoyado', 'Cierra la muñeca hacia ti', 'Sin ayudarte con el codo'],
     camera: 'De lado, con la muñeca y la mano en perfil.', precision: 'Media',
     perWeek: { min: 3, max: 4, note: 'según la intensidad' }, intensity: { min: 60, max: 60 },
   },
   {
     id: 'wrist_adduction', name: 'Aducción de muñeca', focus: 'Muñeca (hacia el meñique)', joint: 'wrist', mode: 'reps',
-    openAbove: 170, closedBelow: 150, minRange: 20, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
+    minRange: 20, tempoMinMs: 1500, tempoMaxMs: 3500, defaultSets: 4,
     cues: ['Antebrazo apoyado y plano', 'Lleva la mano hacia el meñique', 'Baja controlado'],
     camera: 'Con la mano de cara a la cámara y la muñeca visible.', precision: 'Media',
     perWeek: { max: 2 }, intensity: { min: 60, max: 60 },
   },
   {
     id: 'finger_hold', name: 'Retención de dedos', focus: 'Dedos y agarre', joint: 'wrist', mode: 'hold',
-    openAbove: 170, closedBelow: 150, minRange: 0, tempoMinMs: 0, tempoMaxMs: 0, defaultSets: 4,
+    minRange: 0, tempoMinMs: 0, tempoMaxMs: 0, defaultSets: 4,
     cues: ['Muñeca neutra', 'Aguanta sin que se abran los dedos', 'Para antes de perder la forma'],
     camera: 'De lado o de frente, con la mano y la muñeca visibles.',
     precision: 'Solo mide el tiempo bajo tensión y lo firme que queda la muñeca',
@@ -56,7 +57,7 @@ export const exercises = [
   },
   {
     id: 'thumb', name: 'Pulgar', focus: 'Pulgar y agarre', joint: 'wrist', mode: 'hold',
-    openAbove: 170, closedBelow: 150, minRange: 0, tempoMinMs: 0, tempoMaxMs: 0, defaultSets: 3,
+    minRange: 0, tempoMinMs: 0, tempoMaxMs: 0, defaultSets: 3,
     cues: ['Muñeca neutra', 'Carga suave', 'Controla el movimiento'],
     camera: 'De frente, con la mano y la muñeca visibles.',
     precision: 'Solo mide el tiempo bajo tensión y lo firme que queda la muñeca',
@@ -64,14 +65,14 @@ export const exercises = [
   },
   {
     id: 'side_pressure', name: 'Side pressure', focus: 'Hombro, pecho y codo', joint: 'elbow', mode: 'reps',
-    openAbove: 125, closedBelow: 80, minRange: 50, tempoMinMs: 1800, tempoMaxMs: 4000, defaultSets: 4,
+    minRange: 50, tempoMinMs: 1800, tempoMaxMs: 4000, defaultSets: 4,
     cues: ['Codo apoyado en el pad', 'Hombro bajo, sin encogerlo', 'Sube y baja sin rebote'],
     camera: 'Con el brazo completo a la vista, de lado o de frente.', precision: 'Media',
     perWeek: { max: 2, maxSparring: 1 }, intensity: { min: 30, max: 40 },
   },
   {
     id: 'block', name: 'Bloque / Up pressure', focus: 'Codo, hombro y espalda', joint: 'elbow', mode: 'reps',
-    openAbove: 140, closedBelow: 95, minRange: 35, tempoMinMs: 2000, tempoMaxMs: 4500, defaultSets: 4,
+    minRange: 35, tempoMinMs: 2000, tempoMaxMs: 4500, defaultSets: 4,
     cues: ['Codo pegado al cuerpo', 'Tira con la espalda', 'No abras el codo al final'],
     camera: 'Con el brazo completo a la vista, de lado o de frente.', precision: 'Media',
     perWeek: { max: 2 }, intensity: { min: 60, max: 60 },
@@ -84,6 +85,9 @@ export const legacyIds = { press: 'side_pressure', back_pressure: 'block' };
 export const exerciseById = (id) => exercises.find((e) => e.id === (legacyIds[id] ?? id)) ?? exercises[0];
 export const jointLabel = (ex) => (ex.joint === 'elbow' ? 'Codo' : 'Muñeca');
 export const isHold = (ex) => ex.mode === 'hold';
+
+/** Minimum swing in degrees for each leg of a repetition: half the target range, at least 8 degrees. */
+export const repDelta = (ex) => Math.max(8, Math.round(ex.minRange * 0.5));
 
 export const painZones = [
   ['wrist', 'Muñeca'], ['elbow', 'Codo'], ['shoulder', 'Hombro'], ['tendon', 'Tendón / antebrazo'], ['fingers', 'Dedos'],

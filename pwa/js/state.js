@@ -153,12 +153,16 @@ export async function updateSet(set) {
   cloudHook?.(set);
   return ok;
 }
-export async function deleteSet(id) {
-  state.sets = state.sets.filter((s) => s.id !== id);
+/** Deletes sets (and their videos). The cloud copy is removed too when a group is connected. */
+export async function deleteSets(ids) {
+  const gone = new Set(ids);
+  state.sets = state.sets.filter((s) => !gone.has(s.id));
   store.saveSets(state.sets);
-  await store.deleteMedia(id);
-  notify();
+  notify(); // the screen updates right away; the videos are cleaned up after
+  deleteHook?.(ids);
+  await Promise.all(ids.map((id) => store.deleteMedia(id)));
 }
+export const deleteSet = (id) => deleteSets([id]);
 export function updatePlan(patch) {
   state.plan = { ...state.plan, ...patch };
   if (patch.sessions) { // keep the derived fields in step with the sessions
@@ -180,6 +184,10 @@ export function clearPlan() {
 let cloudHook = null;
 export const onSetSaved = (fn) => {
   cloudHook = fn;
+};
+let deleteHook = null;
+export const onSetsDeleted = (fn) => {
+  deleteHook = fn;
 };
 
 // ---- rest timer ------------------------------------------------------------------------------

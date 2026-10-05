@@ -1,5 +1,5 @@
 // Shell: bottom tabs, overlay layer (report / replay), install prompt and service worker.
-import { subscribe, onSetSaved } from './state.js';
+import { subscribe, onSetSaved, onSetsDeleted } from './state.js';
 import * as cloud from './cloud.js';
 import { icon, on } from './ui.js';
 import * as home from './screens/home.js';
@@ -116,6 +116,7 @@ if (/iphone|ipad/i.test(navigator.userAgent) && !standalone) {
 
 // ---- start ------------------------------------------------------------------------------------
 onSetSaved((set) => cloud.pushSet(set));
+onSetsDeleted((ids) => cloud.deleteSets(ids));
 cloud.init();
 api.go(location.hash.replace('#/', '') || 'inicio');
 renderTabs();

@@ -43,24 +43,31 @@ export function loadLandmarker(onStatus = () => {}) {
 
 /**
  * Reads the chosen arm from the landmarks of one frame. Angles are computed in pixel space
- * (normalised x,y have different scales). Returns null when the arm is not confidently seen.
+ * (normalised x,y have different scales). Only the points the exercise needs have to be visible:
+ * the elbow angle needs shoulder, elbow and wrist; the wrist angle needs elbow, wrist and index finger,
+ * so a close-up of the forearm with the shoulder out of the picture still works.
+ * Returns null when those points are not confidently seen.
  */
-export function readArm(landmarks, arm, width, height, minVisibility = 0.5) {
+export function readArm(landmarks, arm, width, height, joint = 'elbow', minVisibility = 0.4) {
   const ix = IDX[arm];
   const pts = [landmarks?.[ix.s], landmarks?.[ix.e], landmarks?.[ix.w], landmarks?.[ix.i]];
-  if (pts.some((p) => !p)) return null;
-  const conf = Math.min(...pts.map((p) => p.visibility ?? 1));
+  const need = joint === 'wrist' ? [1, 2, 3] : [0, 1, 2];
+  if (!landmarks || need.some((k) => !pts[k])) return null;
+  const conf = Math.min(...need.map((k) => pts[k].visibility ?? 1));
   if (conf < minVisibility) return null;
-  const px = pts.map((p) => ({ x: p.x * width, y: p.y * height }));
+  const px = pts.map((q) => ({ x: q.x * width, y: q.y * height }));
   const p = pts.flatMap((q) => [q.x, q.y]);
   return {
     p, // shoulder x,y · elbow x,y · wrist x,y · index x,y — normalised 0..1
-    elbowAngle: jointAngle(px[0], px[1], px[2]),
+    elbowAngle: joint === 'wrist' ? null : jointAngle(px[0], px[1], px[2]),
     wristAngle: jointAngle(px[1], px[2], px[3]),
     confidence: conf,
-    inFrame: p.every((v) => v > 0.02 && v < 0.98),
+    inFrame: need.every((k) => p[k * 2] > 0.02 && p[k * 2] < 0.98 && p[k * 2 + 1] > 0.02 && p[k * 2 + 1] < 0.98),
   };
 }
+
+/** Angle tracked by an exercise: the elbow or the wrist angle of a reading. */
+export const trackedAngle = (reading, joint) => (reading ? (joint === 'elbow' ? reading.elbowAngle : reading.wristAngle) : null);
 
 /**
  * Draws the arm skeleton. p is normalised; the canvas must cover exactly the image area.
@@ -80,8 +87,8 @@ export function drawArm(ctx, p, joint, angle, mirror = false) {
   ctx.strokeStyle = grad;
   ctx.lineWidth = Math.max(5, w * 0.018);
   ctx.beginPath();
-  ctx.moveTo(...s);
-  ctx.lineTo(...e);
+  if (joint === 'wrist') ctx.moveTo(...e); // close-up of the forearm: the shoulder may be out of the picture
+  else { ctx.moveTo(...s); ctx.lineTo(...e); }
   ctx.lineTo(...wr);
   ctx.stroke();
   ctx.lineWidth = Math.max(4, w * 0.013);
@@ -99,7 +106,7 @@ export function drawArm(ctx, p, joint, angle, mirror = false) {
     ctx.strokeStyle = tracked ? '#FF8A4C' : '#fff';
     ctx.stroke();
   };
-  dot(s, false);
+  if (joint !== 'wrist') dot(s, false);
   dot(e, joint === 'elbow');
   dot(wr, joint === 'wrist');
   dot(ix, false);

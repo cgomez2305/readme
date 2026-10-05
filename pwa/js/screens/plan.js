@@ -2,7 +2,8 @@
 // guidelines (frequency, intensity, tendon recovery) and apply it. Each day can be edited by hand.
 import { state, subscribe, updatePlan, clearPlan, setOneRm } from '../state.js';
 import { exercises, exerciseById, freqText, freqMax, intensityText } from '../exercises.js';
-import { weeklyDaysFor } from '../analysis.js';
+import { weeklyDaysFor, setsInWeek } from '../analysis.js';
+import { openResetWeek } from './manage.js';
 import {
   generatePlan, checkPlan, allowedDays, CYCLE, dayName, prescriptionText, pctText, itemKg, weakArms, planToStored,
   setSessionExercises, GROUP_LABEL, GROUP,
@@ -112,6 +113,9 @@ export function mount(root) {
         }).join('')}
         <p class="tiny" style="margin-top:10px;color:var(--teal)">Intensidad: trabaja con el 60% de tu 1RM (side pressure, 30-40%). Nunca vayas al máximo ni al fallo: ahí aparece la tendinitis.</p>
       </div>
+      <div class="glass row"><div class="grow"><div class="bold">Esta semana</div>
+        <div class="muted tiny">${(() => { const n = setsInWeek(state.sets, new Date()).length; return n ? `${n} ${n === 1 ? 'serie guardada' : 'series guardadas'}. Si las grabaciones no quedaron bien, puedes empezar de cero.` : 'Todavía no hay series guardadas esta semana.'; })()}</div></div>
+        <button class="btn ghost small" id="plan-reset" ${setsInWeek(state.sets, new Date()).length ? '' : 'disabled'}>Reiniciar semana</button></div>
       <div class="glass">
         <div class="bold">Recordatorios</div>
         <p class="muted small" style="margin:4px 0 12px">Una app web no puede avisarte con la app cerrada. Descarga el plan como evento semanal y tu calendario te avisará 10 minutos antes.</p>
@@ -178,6 +182,7 @@ export function mount(root) {
     '[data-seg="pdays"]': (el) => { params = { ...params, days: Number(el.dataset.v) }; dirty = true; render(); },
     '[data-seg="pweek"]': (el) => { params = { ...params, week: Number(el.dataset.v) }; dirty = true; render(); },
     '#plan-rm': openRm,
+    '#plan-reset': () => openResetWeek(),
     '[data-edit]': (el) => openEdit(Number(el.dataset.edit)),
     '#plan-apply': () => {
       const generated = generatePlan({ ...params, weakArms: weakArms(state.sets) });

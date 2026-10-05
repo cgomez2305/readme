@@ -28,60 +28,65 @@ export const setAvgRange = (s) => mean(s.reps.map(repRange));
 export const setAvgTempo = (s) => mean(s.reps.map(repDuration));
 
 /**
- * Builds repetitions from (time, angle) samples. A rep starts when the angle drops below
- * openAbove, is valid once it goes below closedBelow, and ends when it returns above openAbove.
- * Partial moves that never reach closedBelow are discarded. The range uses the highest angle
- * seen before the drop, so it covers the whole movement.
+ * Builds repetitions from (time, angle) samples by following the turning points of the signal.
+ * A repetition is one full cycle: peak -> valley -> peak, and every leg has to move at least `delta`
+ * degrees. Nothing depends on absolute angles, so it works for any camera position and any joint.
+ * The range of a repetition is the valley against the higher of its two peaks.
  */
 export class RepTracker {
-  constructor(openAbove, closedBelow) {
-    this.openAbove = openAbove;
-    this.closedBelow = closedBelow;
-    this.reps = [];
+  constructor(delta = 10) {
+    this.delta = delta;
     this.reset();
   }
   reset() {
     this.reps = [];
-    this.inRep = false;
-    this.reached = false;
-    this.openPeak = 0;
-    this.start = 0;
-    this.min = 180;
-    this.max = 0;
-    this.wristSum = 0;
-    this.wristN = 0;
+    this.mode = 'init'; // 'init' | 'down' (looking for the next valley) | 'up' (looking for the next peak)
+    this.hi = null; this.lo = null; // running extremes {v, t}
+    this.prevPeak = null; this.valley = null;
+    this.samples = []; // wrist samples since the last peak: [t, wrist]
   }
   add(tMs, angle, wrist) {
-    if (!this.inRep) {
-      if (angle >= this.openAbove) {
-        if (angle > this.openPeak) this.openPeak = angle;
-        return;
+    if (wrist != null) this.samples.push([tMs, wrist]);
+    const d = this.delta;
+    const pt = { v: angle, t: tMs };
+    if (this.mode === 'init') {
+      if (!this.hi || angle > this.hi.v) this.hi = pt;
+      if (!this.lo || angle < this.lo.v) this.lo = pt;
+      if (this.hi.v - angle >= d && this.hi.t <= this.lo.t) { // fell from a peak
+        this.mode = 'down'; this.prevPeak = this.hi; this.lo = pt; this.samples = this.samples.filter((x) => x[0] >= this.hi.t);
+      } else if (angle - this.lo.v >= d && this.lo.t <= this.hi.t) { // rose from a valley
+        this.mode = 'up'; this.valley = this.lo; this.hi = pt;
       }
-      this.inRep = true;
-      this.reached = false;
-      this.start = tMs;
-      this.min = angle;
-      this.max = Math.max(angle, this.openPeak);
-      this.wristSum = 0;
-      this.wristN = 0;
+      return;
     }
-    if (angle < this.min) this.min = angle;
-    if (angle > this.max) this.max = angle;
-    if (wrist != null) {
-      this.wristSum += wrist;
-      this.wristN++;
+    if (this.mode === 'down') {
+      if (angle < this.lo.v) this.lo = pt;
+      if (angle - this.lo.v >= d) { this.mode = 'up'; this.valley = this.lo; this.hi = pt; }
+      return;
     }
-    if (angle < this.closedBelow) this.reached = true;
-    if (angle >= this.openAbove) {
-      if (this.reached) {
-        const rep = { s: this.start, e: tMs, mn: this.min, mx: this.max };
-        if (this.wristN) rep.w = this.wristSum / this.wristN;
+    // mode 'up'
+    if (angle > this.hi.v) this.hi = pt;
+    if (this.hi.v - angle >= d) {
+      if (this.prevPeak && this.valley) {
+        const s = this.prevPeak.t, e = this.hi.t;
+        const rep = { s, e, mn: this.valley.v, mx: Math.max(this.prevPeak.v, this.hi.v) };
+        const w = this.samples.filter((x) => x[0] >= s && x[0] <= e).map((x) => x[1]);
+        if (w.length) rep.w = mean(w);
         this.reps.push(rep);
       }
-      this.inRep = false;
-      this.openPeak = angle;
+      this.prevPeak = this.hi;
+      this.samples = this.samples.filter((x) => x[0] >= this.hi.t);
+      this.mode = 'down';
+      this.lo = pt;
     }
   }
+}
+
+/** Exponential smoothing for an angle stream; call reset() when the arm was lost. */
+export class Smoother {
+  constructor(alpha = 0.5) { this.alpha = alpha; this.v = null; }
+  push(x) { this.v = this.v == null ? x : this.v + this.alpha * (x - this.v); return this.v; }
+  reset() { this.v = null; }
 }
 
 /** First rep (1-based) where range falls 15% or tempo slows 25% against the first three. Needs 5+ reps. */
@@ -156,6 +161,15 @@ const addDays = (d, n) => {
 };
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const when = (s) => new Date(s.at);
+
+/** Sets recorded on the same calendar day as `day`. */
+export const setsInDay = (sets, day) => sets.filter((s) => dayKey(when(s)) === dayKey(day));
+
+/** Sets recorded in the Monday-to-Sunday week that contains `ref`. */
+export function setsInWeek(sets, ref) {
+  const start = weekStart(ref), end = addDays(start, 7);
+  return sets.filter((s) => when(s) >= start && when(s) < end);
+}
 
 export function trainingDaysInWeek(sets, ref) {
   const start = weekStart(ref), end = addDays(start, 7);
@@ -274,4 +288,31 @@ export function frequencyTips(ex, daysThisWeek, sparring = false) {
       text: `Es el día ${daysThisWeek} de esta semana con ${ex.name} y la guía es máx. ${max}. Deja descansar ese tendón.` }];
   }
   return [];
+}
+
+/**
+ * Explains why a set has few or no repetitions, from how much of the time the arm was seen (cov, 0..1)
+ * and the observed angle swing (obs = [min, max]). Returns tips in the same shape as summarize().
+ */
+export function diagnoseSet(set, ex, delta) {
+  if (set.cov == null) return [];
+  const out = [];
+  const pct = Math.round(set.cov * 100);
+  const swing = set.obs ? set.obs[1] - set.obs[0] : 0;
+  if (set.cov < 0.5) {
+    out.push({ level: 'warn', title: `Solo vi tu brazo el ${pct}% del tiempo`,
+      text: 'Acerca o aleja el móvil hasta que se vean el codo, la muñeca y la mano completos, con buena luz. Si usas la cámara frontal, apoya el móvil firme frente a ti. Si la app te ve el otro brazo, cambia el brazo elegido.' });
+  } else if (set.cov < 0.8) {
+    out.push({ level: 'info', title: `Detección parcial: ${pct}%`, text: 'Se perdió el brazo varias veces. Más luz y el brazo siempre dentro de la imagen mejoran el conteo.' });
+  }
+  if (set.reps.length < 3 && set.cov >= 0.5) {
+    if (swing < delta) {
+      out.push({ level: 'warn', title: 'El ángulo casi no cambió',
+        text: `Solo se vio un movimiento de ${Math.round(swing)}° y hace falta al menos ${delta}° por tramo. La cámara no está viendo el movimiento: prueba otra posición (de lado suele ir mejor) o mueve el brazo a la vista.` });
+    } else {
+      out.push({ level: 'info', title: 'Hubo movimiento, pero no repeticiones completas',
+        text: `Se vio un movimiento de ${Math.round(swing)}°. Cada repetición tiene que bajar y volver a subir al menos ${delta}°. Haz el recorrido completo en cada una.` });
+    }
+  }
+  return out;
 }

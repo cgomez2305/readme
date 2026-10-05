@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  jointAngle, RepTracker, detectFatigue, summarize, weekStart, trainingDaysInWeek, weeklyStreak,
+  jointAngle, RepTracker, Smoother, diagnoseSet, detectFatigue, summarize, weekStart, trainingDaysInWeek, weeklyStreak,
   compareArms, painEvents, rangeTrend, setAvgRange,
 } from '../js/analysis.js';
-import { exerciseById } from '../js/exercises.js';
+import { exerciseById, exercises, repDelta } from '../js/exercises.js';
 
 const rep = (s, dur, mn, mx) => ({ s, e: s + dur, mn, mx });
 const mk = (at, o = {}) => ({
@@ -18,27 +18,92 @@ test('jointAngle', () => {
   assert.equal(jointAngle({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }), 0);
 });
 
-test('RepTracker counts cycles with timing and range', () => {
-  const t = new RepTracker(120, 70);
-  for (const [ms, a] of [[0, 150], [200, 110], [400, 60], [600, 100], [800, 130], [1000, 150], [1200, 100], [1400, 55], [1600, 125]]) t.add(ms, a);
-  assert.equal(t.reps.length, 2);
-  assert.equal(t.reps[0].s, 200);
-  assert.equal(t.reps[0].e, 800);
-  assert.equal(t.reps[0].mn, 60);
-  assert.equal(t.reps[0].mx, 150);
-  assert.equal(t.reps[1].mn, 55);
+// A deterministic "noise" so tests do not depend on Math.random.
+const noise = (i, amp) => (((i * 7919) % 13) / 12 - 0.5) * 2 * amp;
+/** Angle stream: oscillates between lo and hi with the given period, sampled at fps. */
+function stream({ lo, hi, periodMs = 3000, seconds = 15, fps = 15, jitter = 0, startAtTop = true }) {
+  const out = [];
+  for (let i = 0, t = 0; t <= seconds * 1000; i++, t = Math.round((i * 1000) / fps)) {
+    const phase = (2 * Math.PI * t) / periodMs;
+    const unit = (startAtTop ? Math.cos(phase) : -Math.cos(phase)) * 0.5 + 0.5; // 1 at the top
+    out.push([t, lo + (hi - lo) * unit + noise(i, jitter)]);
+  }
+  return out;
+}
+const count = (samples, delta) => {
+  const t = new RepTracker(delta);
+  for (const [ms, a] of samples) t.add(ms, a);
+  return t;
+};
+
+test('RepTracker counts full cycles with timing and range', () => {
+  const t = count(stream({ lo: 60, hi: 140 }), 20);
+  assert.ok(t.reps.length >= 4 && t.reps.length <= 5, `reps ${t.reps.length}`);
+  for (const r of t.reps) {
+    assert.ok(Math.abs(r.e - r.s - 3000) < 250, `duration ${r.e - r.s}`);
+    assert.ok(Math.abs(r.mx - r.mn - 80) < 6, `range ${r.mx - r.mn}`);
+  }
 });
 
-test('partial moves are not reps', () => {
-  const t = new RepTracker(120, 70);
-  for (const [ms, a] of [[0, 150], [200, 100], [400, 90], [600, 140]]) t.add(ms, a);
-  assert.equal(t.reps.length, 0);
+test('works whatever the absolute angles are (a wrist that never reaches 170 degrees)', () => {
+  // This is the case the old absolute thresholds missed: a real wrist moves between, say, 135 and 165.
+  const wrist = count(stream({ lo: 135, hi: 165 }), 10);
+  assert.ok(wrist.reps.length >= 4, `wrist reps ${wrist.reps.length}`);
+  const shifted = count(stream({ lo: 135 + 15, hi: 165 + 15 }), 10);
+  assert.ok(shifted.reps.length >= 4, 'a different camera position shifts the angles but not the count');
+  const fromBottom = count(stream({ lo: 60, hi: 140, startAtTop: false }), 20);
+  assert.ok(fromBottom.reps.length >= 4, 'starting from the bottom works too');
+});
+
+test('tolerates jitter in the angle', () => {
+  const t = count(stream({ lo: 135, hi: 165, jitter: 3 }), 10);
+  assert.ok(t.reps.length >= 4 && t.reps.length <= 5, `reps ${t.reps.length}`);
+});
+
+test('small wobbles and slow drifts are not repetitions', () => {
+  assert.equal(count(stream({ lo: 147, hi: 153, jitter: 1 }), 10).reps.length, 0);
+  const drift = Array.from({ length: 200 }, (_, i) => [i * 100, 170 - i * 0.4]);
+  assert.equal(count(drift, 10).reps.length, 0);
+  assert.equal(count([], 10).reps.length, 0);
+});
+
+test('fast and slow tempos are both counted', () => {
+  assert.ok(count(stream({ lo: 60, hi: 140, periodMs: 1500, seconds: 12 }), 20).reps.length >= 7);
+  assert.ok(count(stream({ lo: 60, hi: 140, periodMs: 6000, seconds: 30 }), 20).reps.length >= 4);
 });
 
 test('wrist average inside a rep', () => {
-  const t = new RepTracker(120, 70);
-  t.add(0, 150); t.add(100, 100, 160); t.add(200, 60, 170); t.add(300, 130, 180);
-  assert.ok(Math.abs(t.reps[0].w - 170) < 1e-9);
+  const t = new RepTracker(10);
+  for (const [ms, a, w] of [[0, 150, 150], [500, 110, 160], [1000, 70, 170], [1500, 110, 175], [2000, 150, 180], [2500, 112, 160], [3000, 70, 160]]) t.add(ms, a, w);
+  assert.equal(t.reps.length, 1);
+  assert.ok(t.reps[0].w > 150 && t.reps[0].w < 180);
+});
+
+test('delta per exercise', () => {
+  assert.equal(repDelta(exerciseById('rising')), 10);
+  assert.equal(repDelta(exerciseById('side_pressure')), 25);
+  assert.ok(exercises.every((e) => repDelta(e) >= 8));
+});
+
+test('Smoother follows the signal and can be reset', () => {
+  const sm = new Smoother(0.5);
+  assert.equal(sm.push(100), 100);
+  assert.equal(sm.push(120), 110);
+  sm.reset();
+  assert.equal(sm.push(50), 50);
+});
+
+test('diagnoseSet explains why nothing was counted', () => {
+  const ex = exerciseById('rising');
+  const base = { reps: [] };
+  assert.deepEqual(diagnoseSet({ reps: [] }, ex, 10), [], 'old sets have no detection data');
+  assert.match(diagnoseSet({ ...base, cov: 0.2, obs: [150, 155] }, ex, 10)[0].title, /20%/);
+  const noSwing = diagnoseSet({ ...base, cov: 0.9, obs: [150, 155] }, ex, 10);
+  assert.equal(noSwing[0].title, 'El ángulo casi no cambió');
+  const some = diagnoseSet({ ...base, cov: 0.9, obs: [120, 160] }, ex, 10);
+  assert.equal(some[0].title, 'Hubo movimiento, pero no repeticiones completas');
+  assert.equal(diagnoseSet({ reps: [1, 2, 3], cov: 0.95, obs: [100, 170] }, ex, 10).length, 0, 'a good set needs no explanation');
+  assert.match(diagnoseSet({ reps: [1, 2, 3], cov: 0.65, obs: [100, 170] }, ex, 10)[0].title, /parcial/);
 });
 
 test('fatigue', () => {
