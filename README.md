@@ -1,4 +1,4 @@
-# ArmIQ — Entrenador de armwrestling con IA
+# Fulcro — Entrenador de armwrestling con IA
 
 App nativa para móvil que analiza en vídeo tus ejercicios y técnica de armwrestling y te da feedback comparándote con competidores profesionales.
 
@@ -51,3 +51,11 @@ Interfaz oscura, tipografía fuerte y esqueleto en neón sobre el vídeo; protot
 - [ ] Grabar un dataset propio de ~50 vídeos
 - [ ] Prototipo de extracción de pose y cálculo de ángulos
 - [ ] Prototipo de UI en Figma
+
+## Identidad (v0)
+- **Nombre:** Fulcro, el punto de apoyo de la palanca; en armwrestling, el codo sobre el pad.
+- **Logo:** `design/logo.svg` (pivote, antebrazo y arco del ángulo medido).
+- **Prototipo de interfaz:** `design/prototype.html` (abrir en el navegador). Oscuro, glassmorphism, 4 pantallas: Inicio, Analizar, Equipo, Técnicas.
+- **Paleta:** cobre `#FF8A4C` (acción), turquesa `#3FE0C5` (ángulo bueno), ámbar `#FFB347` (atención), grafito `#0E1118`.
+- **Tipografías:** Unbounded (títulos) y Figtree (texto).
+- **Modelo de negocio:** primero gratis para el grupo de entrenamiento; después plan Pro por suscripción.

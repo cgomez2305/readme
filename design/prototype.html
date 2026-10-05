@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>html,body{margin:0}</style></head><body>
+<title>Fulcro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: brand panel on the left, phone mock on the right; stacks on narrow screens.
+   Single dark look by choice: glass needs a dark ground with blurred copper and teal light behind it. */
+:root{
+  --ink:#07080C;          /* page ground, blue-biased black */
+  --panel:#0E1118;        /* phone ground */
+  --text:#F2F4F8;
+  --muted:#9AA3B5;
+  --copper:#FF8A4C;       /* accent: the lever */
+  --teal:#3FE0C5;         /* good / angle measure */
+  --amber:#FFC27A;
+  --warn:#FFB347;
+  --glass:rgba(255,255,255,.07);
+  --glass-strong:rgba(255,255,255,.12);
+  --edge:rgba(255,255,255,.14);
+  --font-display:'Unbounded','Trebuchet MS',sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--ink);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:32px;min-height:100%}
+.stage{max-width:1000px;margin-inline:auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,400px);gap:48px;align-items:center}
+@media (max-width:820px){.stage{grid-template-columns:minmax(0,1fr);gap:32px}}
+
+/* brand panel */
+.brand{display:flex;flex-direction:column;gap:28px;min-width:0}
+.lockup{display:flex;align-items:center;gap:18px}
+.lockup svg{width:84px;height:84px;flex:none}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:clamp(34px,6vw,52px);letter-spacing:.04em;line-height:1}
+.tagline{font-size:20px;max-width:30ch;text-wrap:balance;color:var(--text)}
+.sub{color:var(--muted);max-width:52ch}
+.swatches{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;background:var(--glass);border:1px solid var(--edge);font-size:12px;color:var(--muted)}
+.sw i{width:20px;height:20px;border-radius:50%;display:block}
+.why{display:grid;gap:10px;padding:16px 18px;border-radius:20px;background:var(--glass);border:1px solid var(--edge);max-width:52ch}
+.why b{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.why p{margin:0;color:var(--muted)}
+
+/* phone */
+.phone{position:relative;width:100%;max-width:390px;height:780px;margin-inline:auto;border-radius:44px;background:var(--panel);border:1px solid var(--edge);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 8px #05060a;overflow:hidden;isolation:isolate}
+.blob{position:absolute;border-radius:50%;filter:blur(60px);z-index:-1;opacity:.55}
+.b1{width:260px;height:260px;background:var(--copper);top:-70px;right:-90px}
+.b2{width:300px;height:300px;background:#12806F;bottom:60px;left:-120px}
+.b3{width:180px;height:180px;background:#7a3a1c;top:300px;right:-60px}
+.screens{position:absolute;inset:0;padding:54px 18px 110px;overflow-y:auto;scrollbar-width:none}
+.screens::-webkit-scrollbar{display:none}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:24px;border-radius:14px;background:#000;z-index:5}
+.screen{display:none;flex-direction:column;gap:14px}
+.screen.on{display:flex}
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid var(--edge);border-radius:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 24px rgba(0,0,0,.25)}
+.pad{padding:16px}
+h1,h2,h3,p{margin:0}
+.hello{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hello h1{font-family:var(--font-display);font-weight:500;font-size:21px;letter-spacing:.01em}
+.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--copper),var(--amber));display:grid;place-items:center;color:#1a0d05;font-weight:700;flex:none}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.row{display:flex;align-items:center;gap:14px}
+.grow{flex:1;min-width:0}
+.big{font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.small{font-size:13px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--glass-strong);border:1px solid var(--edge)}
+.chip.good{color:var(--teal)}
+.chip.warn{color:var(--warn)}
+.btn{appearance:none;border:0;cursor:pointer;font:inherit;font-weight:700;color:#1a0d05;background:linear-gradient(135deg,var(--copper),var(--amber));padding:13px 18px;border-radius:16px;width:100%;box-shadow:0 8px 20px rgba(255,138,76,.3)}
+.btn:focus-visible,.tab:focus-visible,.seg button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn.ghost{background:var(--glass-strong);color:var(--text);box-shadow:none;border:1px solid var(--edge)}
+.ring{width:84px;height:84px;flex:none;position:relative}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:17px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.metric{padding:14px;display:flex;flex-direction:column;gap:4px}
+.metric .big{font-size:24px}
+.metric small{font-size:12px;color:var(--muted)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:64px}
+.bars i{flex:1;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,var(--teal),rgba(63,224,197,.25))}
+.bars i.off{background:linear-gradient(180deg,var(--warn),rgba(255,179,71,.25))}
+.video{position:relative;height:230px;border-radius:22px;overflow:hidden;border:1px solid var(--edge);background:radial-gradient(circle at 30% 20%,#1d2433,#0a0d14)}
+.video svg{position:absolute;inset:0;width:100%;height:100%}
+.live{position:absolute;top:12px;left:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#ff5a5a;display:inline-block}
+.rec .dot{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.rec .dot{animation:none}}
+.tip{display:flex;gap:12px;align-items:flex-start}
+.tip .ic{width:34px;height:34px;border-radius:12px;flex:none;display:grid;place-items:center;background:var(--glass-strong);border:1px solid var(--edge);font-weight:700;font-size:13px}
+.seg{display:flex;padding:4px;gap:4px;border-radius:16px}
+.seg button{flex:1;appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;font-size:13px;padding:9px 6px;border-radius:12px;cursor:pointer}
+.seg button.on{background:var(--glass-strong);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+.person{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.person .avatar{width:36px;height:36px;font-size:14px}
+.person .n{font-variant-numeric:tabular-nums;font-weight:700}
+.tech{display:flex;gap:14px;align-items:center;padding:14px}
+.tech svg{width:64px;height:48px;flex:none}
+.soon{font-size:11px;color:var(--amber)}
+.plans{display:grid;gap:10px}
+.plan{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.plan.cur{border-color:rgba(63,224,197,.5)}
+.note{font-size:11px;color:var(--muted);text-align:center}
+.tabs{position:absolute;left:14px;right:14px;bottom:14px;display:flex;padding:6px;gap:4px;border-radius:26px;z-index:4;background:rgba(18,21,28,.55);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border:1px solid var(--edge);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 30px rgba(0,0,0,.4)}
+.tab{flex:1;appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:600;padding:9px 0 7px;border-radius:20px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--text);background:var(--glass-strong)}
+.tab.on svg{stroke:var(--copper)}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF8A4C"/><stop offset="1" stop-color="#FFC27A"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="18" fill="#12151C"/>
+      <path d="M14 46H50" stroke="#fff" stroke-opacity=".28" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <path d="M18 46L44 20" stroke="url(#lg)" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M30 46A12 12 0 0 0 26.5 37.5" stroke="#3FE0C5" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <circle cx="18" cy="46" r="5" fill="#12151C" stroke="#FF8A4C" stroke-width="3"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main class="stage">
+  <section class="brand">
+    <div class="lockup">
+      <svg aria-hidden="true"><use href="#logo"/></svg>
+      <div class="wordmark">FULCRO</div>
+    </div>
+    <p class="tagline">Cada grado del codo cuenta.</p>
+    <p class="sub">El fulcro es el punto de apoyo de la palanca. En el armwrestling es tu codo sobre el pad. El logo es ese punto, el antebrazo y el ángulo que la app mide en cada repetición.</p>
+    <div class="swatches" aria-label="Paleta">
+      <span class="sw"><i style="background:#FF8A4C"></i>Cobre · acción</span>
+      <span class="sw"><i style="background:#3FE0C5"></i>Turquesa · ángulo bueno</span>
+      <span class="sw"><i style="background:#FFB347"></i>Ámbar · atención</span>
+      <span class="sw"><i style="background:#0E1118;border:1px solid #333"></i>Grafito</span>
+    </div>
+    <div class="why">
+      <b>Por qué este nombre</b>
+      <p>Corto, en español, se pronuncia igual que se lee y suena a fuerza. Funciona como app de grupo hoy y como marca de suscripción mañana.</p>
+    </div>
+  </section>
+
+  <div class="phone" aria-label="Prototipo de la app">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+    <span class="notch"></span>
+    <div class="screens" id="screens">
+
+      <!-- INICIO -->
+      <section class="screen on" id="s-inicio" aria-label="Inicio">
+        <div class="hello">
+          <div><p class="eyebrow">Lunes · Semana 14</p><h1>Hola, atleta</h1></div>
+          <div class="avatar">A</div>
+        </div>
+        <div class="glass pad">
+          <p class="eyebrow">Sesión de hoy</p>
+          <div class="row" style="margin-top:6px">
+            <div class="grow"><h2 style="font-size:20px">Press lateral</h2><p class="small">4 series · 8 reps · polea baja</p></div>
+            <span class="chip warn">Muñeca</span>
+          </div>
+          <button class="btn" style="margin-top:14px" data-go="analizar">Grabar y analizar</button>
+        </div>
+        <div class="glass pad row">
+          <div class="ring">
+            <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="34" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="8"/><circle cx="42" cy="42" r="34" fill="none" stroke="url(#lg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="214" stroke-dashoffset="64"/></svg>
+            <span>5/7</span>
+          </div>
+          <div class="grow"><h3 style="font-size:16px">Meta semanal</h3><p class="small">Te faltan 2 sesiones. Racha de 3 semanas.</p></div>
+        </div>
+        <div class="grid2">
+          <div class="glass metric"><small>Ángulo de codo</small><span class="big">101°</span><span class="chip good" style="align-self:flex-start">+4° vs. mes pasado</span></div>
+          <div class="glass metric"><small>Simetría</small><span class="big">94%</span><span class="chip warn" style="align-self:flex-start">Mano izq. −6%</span></div>
+        </div>
+        <div class="glass pad">
+          <div class="row"><h3 class="grow" style="font-size:16px">Ángulo por repetición</h3><span class="small">Último análisis</span></div>
+          <div class="bars" style="margin-top:12px" aria-hidden="true">
+            <i style="height:78%"></i><i style="height:82%"></i><i style="height:80%"></i><i style="height:76%"></i><i class="off" style="height:58%"></i><i class="off" style="height:52%"></i><i class="off" style="height:46%"></i><i class="off" style="height:42%"></i>
+          </div>
+          <p class="small" style="margin-top:10px">Desde la rep 5 tu codo se abre. Es el primer signo de fatiga.</p>
+        </div>
+        <p class="note">Datos de ejemplo</p>
+      </section>
+
+      <!-- ANALIZAR -->
+      <section class="screen" id="s-analizar" aria-label="Analizar">
+        <div class="hello"><div><p class="eyebrow">Press lateral · Serie 2</p><h1>Análisis</h1></div></div>
+        <div class="video" id="video">
+          <span class="chip live"><i class="dot"></i><span id="recTxt">Listo</span></span>
+          <svg viewBox="0 0 320 230" aria-hidden="true">
+            <path d="M20 190H300" stroke="rgba(255,255,255,.2)" stroke-width="3" stroke-linecap="round"/>
+            <path d="M60 70L130 160L230 110" fill="none" stroke="url(#lg)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M155 147.5A28 28 0 0 0 112.8 137.9" fill="none" stroke="#3FE0C5" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="60" cy="70" r="7" fill="#0E1118" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="130" cy="160" r="8" fill="#0E1118" stroke="#FF8A4C" stroke-width="3"/>
+            <circle cx="230" cy="110" r="7" fill="#0E1118" stroke="#fff" stroke-width="2.5"/>
+            <rect x="140" y="104" width="52" height="26" rx="13" fill="rgba(63,224,197,.18)" stroke="#3FE0C5"/>
+            <text x="166" y="122" text-anchor="middle" fill="#3FE0C5" font-size="14" font-weight="700" font-family="Figtree,sans-serif">101°</text>
+          </svg>
+        </div>
+        <div class="seg glass" role="tablist" aria-label="Ejercicio">
+          <button class="on">Press</button><button>Pronación</button><button>Hook</button>
+        </div>
+        <div class="grid2">
+          <div class="glass metric"><small>Codo</small><span class="big">101°</span><span class="chip good" style="align-self:flex-start">En rango</span></div>
+          <div class="glass metric"><small>Muñeca</small><span class="big">18°</span><span class="chip warn" style="align-self:flex-start">Se abre</span></div>
+          <div class="glass metric"><small>Tempo</small><span class="big">2.1s</span><span class="chip good" style="align-self:flex-start">Controlado</span></div>
+          <div class="glass metric"><small>Reps</small><span class="big">8</span><span class="chip" style="align-self:flex-start">de 8</span></div>
+        </div>
+        <div class="glass pad tip">
+          <div class="ic" style="color:var(--amber)">!</div>
+          <div><h3 style="font-size:15px">Mantén la muñeca cerrada</h3><p class="small">En las reps 5 a 8 la muñeca se abre 12° más que en las primeras. Baja el peso o reduce el rango.</p></div>
+        </div>
+        <button class="btn" id="recBtn">Grabar otra serie</button>
+      </section>
+
+      <!-- EQUIPO -->
+      <section class="screen" id="s-equipo" aria-label="Equipo">
+        <div class="hello"><div><p class="eyebrow">Grupo de entrenamiento</p><h1>Equipo</h1></div></div>
+        <div class="glass pad">
+          <p class="eyebrow">Sesiones esta semana</p>
+          <div class="row" style="margin-top:6px"><span class="big">23</span><span class="chip good">+4 vs. semana pasada</span></div>
+        </div>
+        <div class="glass" style="overflow:hidden">
+          <div class="person"><div class="avatar">M</div><div class="grow"><b>Marcos</b><p class="small">Top roll · hoy</p></div><span class="n">6</span></div>
+          <div class="person" style="border-top:1px solid var(--edge)"><div class="avatar">A</div><div class="grow"><b>Tú</b><p class="small">Press · hoy</p></div><span class="n">5</span></div>
+          <div class="person" style="border-top:1px solid var(--edge)"><div class="avatar">L</div><div class="grow"><b>Luis</b><p class="small">Hook · ayer</p></div><span class="n">4</span></div>
+          <div class="person" style="border-top:1px solid var(--edge)"><div class="avatar">D</div><div class="grow"><b>Diego</b><p class="small">Pronación · hace 2 días</p></div><span class="n">3</span></div>
+        </div>
+        <h3 style="font-size:15px;margin-top:4px">Planes</h3>
+        <div class="plans">
+          <div class="glass plan cur"><div><b>Grupo</b><p class="small">Hasta 10 atletas. Análisis ilimitado.</p></div><span class="chip good">Actual</span></div>
+          <div class="glass plan"><div><b>Pro</b><p class="small">Comparación con referencias y plan adaptativo.</p></div><span class="soon">Próximamente</span></div>
+        </div>
+        <p class="note">Datos de ejemplo</p>
+      </section>
+
+      <!-- TECNICAS -->
+      <section class="screen" id="s-tecnicas" aria-label="Técnicas">
+        <div class="hello"><div><p class="eyebrow">Biblioteca de referencia</p><h1>Técnicas</h1></div></div>
+        <div class="seg glass"><button class="on">Todas</button><button>Hook</button><button>Top roll</button><button>Press</button></div>
+        <div class="glass tech">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M8 40H56" stroke="rgba(255,255,255,.25)" stroke-width="3" stroke-linecap="round"/><path d="M12 14L26 34L48 22" fill="none" stroke="url(#lg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="grow"><b>Hook</b><p class="small">Codo cerrado, bíceps y muñeca en flexión.</p></div><span class="chip">12 clips</span>
+        </div>
+        <div class="glass tech">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M8 40H56" stroke="rgba(255,255,255,.25)" stroke-width="3" stroke-linecap="round"/><path d="M10 28L30 36L54 14" fill="none" stroke="url(#lg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="grow"><b>Top roll</b><p class="small">Dedos arriba, rotación y tracción hacia ti.</p></div><span class="chip">9 clips</span>
+        </div>
+        <div class="glass tech">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M8 40H56" stroke="rgba(255,255,255,.25)" stroke-width="3" stroke-linecap="round"/><path d="M14 18L28 36L52 30" fill="none" stroke="url(#lg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="grow"><b>Press</b><p class="small">Empuje con el hombro y el pecho.</p></div><span class="chip">7 clips</span>
+        </div>
+        <div class="glass pad tip">
+          <div class="ic" style="color:var(--teal)">↔</div>
+          <div><h3 style="font-size:15px">Comparar con tu ejecución</h3><p class="small">Disponible en la versión Pro. Superpone tu esqueleto sobre la referencia.</p></div>
+        </div>
+        <p class="note">Contenido de ejemplo</p>
+      </section>
+    </div>
+
+    <nav class="tabs" aria-label="Navegación">
+      <button class="tab on" data-tab="inicio"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></svg>Inicio</button>
+      <button class="tab" data-tab="analizar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12l5-5"/><circle cx="12" cy="12" r="1.5"/></svg>Analizar</button>
+      <button class="tab" data-tab="equipo"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5M15 15c2.4-.2 4.6.8 5.5 3.5"/></svg>Equipo</button>
+      <button class="tab" data-tab="tecnicas"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>Técnicas</button>
+    </nav>
+  </div>
+</main>
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('.tab'),screens=document.getElementById('screens');
+  function show(name){
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.toggle('on',s.id==='s-'+name)});
+    tabs.forEach(function(t){t.classList.toggle('on',t.dataset.tab===name)});
+    screens.scrollTop=0;
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){show(t.dataset.tab)})});
+  document.querySelectorAll('[data-go]').forEach(function(b){b.addEventListener('click',function(){show(b.dataset.go)})});
+  document.querySelectorAll('.seg').forEach(function(seg){
+    seg.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      seg.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+    });
+  });
+  var rec=false,video=document.getElementById('video'),txt=document.getElementById('recTxt'),btn=document.getElementById('recBtn');
+  btn.addEventListener('click',function(){
+    rec=!rec;
+    video.classList.toggle('rec',rec);
+    txt.textContent=rec?'Grabando':'Listo';
+    btn.textContent=rec?'Detener':'Grabar otra serie';
+    btn.classList.toggle('ghost',rec);
+  });
+})();
+</script>
+
+</body></html>
