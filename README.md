@@ -1,27 +1,53 @@
-# description# 💫 About Me:
-I am a full stack developer with experience in software development and training in telecommunications engineering studying. I always seek to learn new things and give my best in each project. I have skills in programming, database design and implementation systems. I am adaptable, willing to work as a team and face challenges. I am passionate about technology and am committed to achieving innovative, high-quality solutions.
+# ArmIQ — Entrenador de armwrestling con IA
 
+App nativa para móvil que analiza en vídeo tus ejercicios y técnica de armwrestling y te da feedback comparándote con competidores profesionales.
 
-## 🌐 Socials:
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-%230077B5.svg?logo=linkedin&logoColor=white)](https://linkedin.com/in/https://www.linkedin.com/in/carlosgomez23/) 
+> Estado: concepto / definición de MVP. Sin código todavía.
 
-# 💻 Tech Stack:
-![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white) ![CSS3](https://img.shields.io/badge/css3-%231572B6.svg?style=for-the-badge&logo=css3&logoColor=white) ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white) ![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E) ![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white) ![Bootstrap](https://img.shields.io/badge/bootstrap-%23563D7C.svg?style=for-the-badge&logo=bootstrap&logoColor=white) ![jQuery](https://img.shields.io/badge/jquery-%230769AD.svg?style=for-the-badge&logo=jquery&logoColor=white) ![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white) ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB) ![NPM](https://img.shields.io/badge/NPM-%23000000.svg?style=for-the-badge&logo=npm&logoColor=white) ![Apache](https://img.shields.io/badge/apache-%23D42029.svg?style=for-the-badge&logo=apache&logoColor=white) 	![Figma](https://img.shields.io/badge/figma-%23F24E1E.svg?style=for-the-badge&logo=figma&logoColor=white) ![Postman](https://img.shields.io/badge/Postman-FF6C37?style=for-the-badge&logo=postman&logoColor=white) ![LINUX](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black) ![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white) ![MySQL](https://img.shields.io/badge/mysql-%2300f.svg?style=for-the-badge&logo=mysql&logoColor=white) ![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white) ![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
-# 📊 GitHub Stats:
-![](https://github-readme-stats.vercel.app/api?username=cgomez2305&theme=highcontrast&hide_border=false&include_all_commits=true&count_private=true)<br/>
-![](https://github-readme-streak-stats.herokuapp.com/?user=cgomez2305&theme=highcontrast&hide_border=false)<br/>
-![](https://github-readme-stats.vercel.app/api/top-langs/?username=cgomez2305&theme=highcontrast&hide_border=false&include_all_commits=true&count_private=true&layout=compact)
+## ¿Es posible?
+Sí, pero por fases. Lo que sí es viable hoy y lo que no:
 
-## 🏆 GitHub Trophies
-![](https://github-profile-trophy.vercel.app/?username=cgomez2305&theme=algolia&no-frame=true&no-bg=false&margin-w=4)
+| Capacidad | Viabilidad | Cómo |
+|---|---|---|
+| Detectar postura y ángulos (muñeca, codo, hombro, tronco) | Alta | Estimación de pose en el propio móvil (MediaPipe Pose / MoveNet) |
+| Contar repeticiones, tempo, rango de movimiento | Alta | Reglas sobre los ángulos de la pose |
+| Comparar tu ejecución con una "referencia" | Media | Alinear secuencias (DTW) entre tu pose y la de un pro |
+| Reconocer técnica (hook, top roll, press, king's move) | Media | Clasificador entrenado con vídeos etiquetados |
+| Analizar un combate (posición inicial, ventaja, momento de pérdida) | Media-baja | Requiere dos personas, mano y mesa visibles, y datos etiquetados |
+| Medir fuerza de muñeca/dedos desde el vídeo | Baja | La cámara no ve fuerza; necesita sensores o dinamómetro externo |
 
-### 🔝 Top Contributed Repo
-![](https://github-contributor-stats.vercel.app/api?username=cgomez2305&limit=5&theme=dark&combine_all_yearly_contributions=true)
+**Punto clave:** no hace falta "entrenar un modelo gigante con vídeos de pros" para empezar. La pose se extrae con modelos ya entrenados; los vídeos de pros sirven para construir *referencias* y, más adelante, un clasificador propio.
 
-### 😂 Random Dev Meme
-<img src="https://rm.up.railway.app/" width="512px"/>
+## Aviso sobre los vídeos de competidores
+Los vídeos de YouTube/Instagram tienen derechos de autor. Para un uso personal de análisis es una zona gris. Para publicar la app o entrenar un modelo comercial necesitas permiso. Opciones: acuerdos con atletas, grabar a compañeros de tu equipo, o guardar solo las poses extraídas (esqueletos), no el vídeo.
 
----
-[![](https://visitcount.itsvg.in/api?id=cgomez2305&icon=9&color=0)](https://visitcount.itsvg.in)
+## MVP (v0.1)
+1. Grabar o subir un vídeo de un ejercicio (curl con polea, pronación, press lateral, rising…).
+2. Extraer pose y mostrar el esqueleto superpuesto.
+3. Métricas por repetición: ángulo de codo y muñeca, rango, tempo, simetría.
+4. Historial y gráficas de progreso por ejercicio.
+5. Consejos basados en reglas ("el codo se despega del pad", "bajas demasiado rápido").
 
-<!-- Proudly created with GPRM ( https://gprm.itsvg.in ) -->
+## Roadmap
+- **v0.2** Biblioteca de referencias de pros (esqueletos) y comparación lado a lado.
+- **v0.3** Clasificación de técnica (hook / top roll / press) con modelo propio.
+- **v0.4** Análisis de combate: detectar posición inicial, ventaja y momento de pérdida.
+- **v0.5** Plan de entrenamiento adaptativo según debilidades detectadas.
+- **Futuro** Sensores externos (dinamómetro BLE) para correlacionar fuerza y técnica.
+
+## Stack propuesto
+- **App:** Flutter o React Native (iOS + Android con un solo código).
+- **Pose en dispositivo:** MediaPipe Pose (privacidad y sin coste de servidor).
+- **Backend (opcional):** Python + FastAPI para entrenar modelos y guardar referencias.
+- **ML:** PyTorch para el clasificador de técnica; DTW para comparar secuencias.
+- **Datos:** Supabase/Firebase para usuarios e historial.
+
+## Diseño
+Interfaz oscura, tipografía fuerte y esqueleto en neón sobre el vídeo; prototipo en Figma antes de programar.
+
+## Siguientes pasos
+- [ ] Decidir Flutter vs React Native
+- [ ] Elegir 3 ejercicios para el MVP
+- [ ] Grabar un dataset propio de ~50 vídeos
+- [ ] Prototipo de extracción de pose y cálculo de ángulos
+- [ ] Prototipo de UI en Figma
