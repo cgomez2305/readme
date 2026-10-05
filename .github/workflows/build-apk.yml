@@ -25,6 +25,11 @@ jobs:
           flutter build apk --release --split-per-abi
           --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
           --dart-define=SUPABASE_KEY=${{ vars.SUPABASE_KEY }}
+      # Universal APK (all CPU types in one file): works on any phone, but is larger.
+      - run: >
+          flutter build apk --release
+          --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
+          --dart-define=SUPABASE_KEY=${{ vars.SUPABASE_KEY }}
       - uses: actions/upload-artifact@v4
         with:
           name: fulcro-apk
